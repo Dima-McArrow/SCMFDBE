@@ -47,7 +47,8 @@ Discovery is a convenience; the fingerprint is never taken from mDNS and manual 
 
 ## Tray
 
-Status · Pair iPad · Network · Trusted devices (revoke one / all) · Pause input (releases immediately) ·
+Status · Pair iPad · Network · Game (choose `StarCitizen.exe` of LIVE, PTU…; `Game.log` is derived from it; applies
+after a restart) · Trusted devices (revoke one / all) · Pause input (releases immediately) ·
 Re-enable input (only after a failed release) · Input monitor · Copy firewall command · Open data folder · Quit.
 
 **Input monitor** (debug window): every command received from the iPad, its result (sent / rejected with reason /

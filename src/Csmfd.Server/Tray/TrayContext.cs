@@ -122,6 +122,7 @@ internal sealed partial class TrayContext : ApplicationContext
         };
         _menu.Items.Add(pair);
         _menu.Items.Add(BuildNetworkMenu());
+        _menu.Items.Add(BuildGameMenu());
         _menu.Items.Add(BuildDevicesMenu());
         _menu.Items.Add(new ToolStripSeparator());
 
@@ -165,6 +166,62 @@ internal sealed partial class TrayContext : ApplicationContext
             Checked = _app.Config.BindAddress is null,
         });
         return menu;
+    }
+
+    private ToolStripMenuItem BuildGameMenu()
+    {
+        var channel = GamePaths.TryFromExe(_app.Config.GameExePath, out var paths, out _) ? paths.Channel : "custom path";
+        var menu = new ToolStripMenuItem("Game: " + channel + (_app.GamePathsNeedRestart ? " (restart to apply)" : string.Empty));
+        // "&" would become a mnemonic underline in a menu item; paths may contain it.
+        menu.DropDownItems.Add(new ToolStripMenuItem(_app.Config.GameExePath.Replace("&", "&&", StringComparison.Ordinal)) { Enabled = false });
+        menu.DropDownItems.Add(new ToolStripSeparator());
+        menu.DropDownItems.Add(new ToolStripMenuItem("Choose StarCitizen.exe…", null, (_, _) => ChooseGameExe()));
+        return menu;
+    }
+
+    /// <summary>LIVE, PTU, EPTU...: Game.log is derived from the exe, so one file dialog is enough.</summary>
+    private void ChooseGameExe()
+    {
+        var folder = Path.GetDirectoryName(_app.Config.GameExePath);
+        using var dialog = new OpenFileDialog
+        {
+            Title = "Choose StarCitizen.exe (for example LIVE\\Bin64 or PTU\\Bin64)",
+            Filter = "Star Citizen (StarCitizen.exe)|" + GamePaths.ExeName,
+            InitialDirectory = folder is not null && Directory.Exists(folder) ? folder : string.Empty,
+            CheckFileExists = true,
+            RestoreDirectory = true,
+        };
+        if (dialog.ShowDialog() != DialogResult.OK)
+        {
+            return;
+        }
+
+        if (!GamePaths.TryFromExe(dialog.FileName, out var paths, out var error))
+        {
+            _icon.ShowBalloonTip(8000, "CSMFD Server", error, ToolTipIcon.Warning);
+            return;
+        }
+
+        if (string.Equals(paths.ExePath, _app.Config.GameExePath, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(paths.LogPath, _app.Config.GameLogPath, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        try
+        {
+            _app.SetGamePaths(paths);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            _icon.ShowBalloonTip(8000, "CSMFD Server", "Could not save the game path: " + ex.Message, ToolTipIcon.Error);
+            return;
+        }
+
+        var text = _app.GamePathsNeedRestart
+            ? "Game set to " + paths.Channel + ". Quit and start CSMFD Server again to apply."
+            : "Game set back to " + paths.Channel + ".";
+        _icon.ShowBalloonTip(8000, "CSMFD Server", text, ToolTipIcon.Info);
     }
 
     private ToolStripMenuItem BuildDevicesMenu()

@@ -34,6 +34,10 @@ internal sealed partial class ServerApp : IAsyncDisposable
     private readonly ILogger _logger;
     private readonly Lock _listenerGate = new();
     private readonly SemaphoreSlim _listenerSwitch = new(1, 1);
+
+    // Paths the running pipeline was built with; Config may hold newer ones until the next start.
+    private readonly string _activeGameExePath;
+    private readonly string _activeGameLogPath;
     private WssHost? _host;
     private MdnsAdvertiser? _mdns;
     private SessionMonitor? _session;
@@ -43,6 +47,8 @@ internal sealed partial class ServerApp : IAsyncDisposable
     {
         Storage = storage ?? throw new ArgumentNullException(nameof(storage));
         Config = storage.LoadConfig();
+        _activeGameExePath = Config.GameExePath;
+        _activeGameLogPath = Config.GameLogPath;
         LoggerFactory = Microsoft.Extensions.Logging.LoggerFactory.Create(builder =>
             builder.SetMinimumLevel(LogLevel.Information)
                 .AddFilter("Microsoft", LogLevel.Warning) // hosting chatter includes full local paths (spec 41.16)
@@ -109,6 +115,11 @@ internal sealed partial class ServerApp : IAsyncDisposable
 
     public ListenerStatus ListenerStatus { get; private set; } = ListenerStatus.NotConfigured;
 
+    /// <summary>True after the tray saved other game paths: they apply at the next start.</summary>
+    public bool GamePathsNeedRestart =>
+        !string.Equals(Config.GameExePath, _activeGameExePath, StringComparison.OrdinalIgnoreCase)
+        || !string.Equals(Config.GameLogPath, _activeGameLogPath, StringComparison.OrdinalIgnoreCase);
+
     public LocalAddress? BoundAddress
     {
         get
@@ -140,9 +151,21 @@ internal sealed partial class ServerApp : IAsyncDisposable
         LogStarting(_logger, Version);
         GameMonitor.Start();
         _session = new SessionMonitor(Executor, LoggerFactory.CreateLogger<SessionMonitor>());
-        LogService.Start(Config.GameLogPath);
+        LogService.Start(_activeGameLogPath);
         NetworkChange.NetworkAddressChanged += OnNetworkChanged;
         await ApplyListenerAsync().ConfigureAwait(true);
+    }
+
+    /// <summary>
+    /// Saves game paths chosen in the tray. They take effect at the next start: the focus check, the game
+    /// monitor and the log tailer are built once with them, and rebuilding them mid-session would risk
+    /// losing track of held input.
+    /// </summary>
+    public void SetGamePaths(GamePaths paths)
+    {
+        ArgumentNullException.ThrowIfNull(paths);
+        Config = Config with { GameExePath = paths.ExePath, GameLogPath = paths.LogPath };
+        Storage.SaveConfig(Config);
     }
 
     /// <summary>Saves the user's choice and restarts the listener on it.</summary>

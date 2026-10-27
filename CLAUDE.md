@@ -99,7 +99,7 @@ Protocol and input decisions never live in the tray or in `WssHost`.
 |---|---|---|
 | Wire format | `Csmfd.Protocol` + fixture + test | `ProtocolV2.swift`, `ServerSession.swift` + Swift Testing suite |
 | New or changed action | `ActionCatalog` + its row in `ActionCatalogTests` | `ShipAction` (default binding must match key and mods exactly) |
-| Emotes | `emotes.txt` in the data folder (default file only has `wave`, `dance`, `gasp`) | `Emote.swift`, then `python3 tools/gen-emotes-md.py <out.md>` produces the `emotes.txt` block |
+| Emotes | `ServerApp.DefaultEmotes` (written to `emotes.txt` only when the file is missing) + count in `DefaultEmotesTests` | `Emote.swift`, then `python3 tools/gen-emotes-md.py <out.md>` produces the list |
 | Pairing payload / port | `PairingForm`, `ProtocolLimits.Port` | `PairingPayload.swift` |
 
 Do not edit the iPad repository from a task in this one unless the user asks; describe what the other side needs.

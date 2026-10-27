@@ -287,11 +287,70 @@ internal sealed partial class ServerApp : IAsyncDisposable
     [LoggerMessage(Level = LogLevel.Warning, Message = "emotes.txt: {Count} invalid entries skipped: {Names}")]
     private static partial void LogEmotesSkipped(ILogger logger, int count, string names);
 
-    private const string DefaultEmotes = """
+    /// <summary>
+    /// Written to emotes.txt on first start. Same stems and order as Emote.swift on the iPad
+    /// (generate with tools/gen-emotes-md.py there): 48 base names, 132 commands.
+    /// </summary>
+    internal const string DefaultEmotes = """
         # Chat emotes the iPad may send, one base name per line ("/name" and "/name<N>" are accepted).
         # Keep this list in sync with Emote.swift on the iPad; anything else is rejected as "invalid".
+
+        # Greetings
         wave
-        dance
+        greet
+        salute
+        bow
+        atease
+        attention
+
+        # Gestures
+        come
+        point
+        wait
+        agree
+        threaten
+        rude
+        flirt
+        chicken
+
+        # Reactions
+        cheer
+        clap
+        laugh
         gasp
+        gloat
+        flex
+        angry
+        bored
+        blah
+        cry
+        failure
+        burp
+        smell
+        whistle
+
+        # Poses
+        dance
+        sit
+        stand
+        sleep
+
+        # Sign language
+        asl_hello
+        asl_goodbye
+        asl_meetyou
+        asl_thanks
+        asl_yes
+        asl_no
+        asl_loveyou
+        asl_canthear
+        asl_sitdown
+        asl_blah
+        asl_bored
+        asl_exhausted
+        asl_sad
+        asl_upset
+        asl_angry
+        asl_bullshit
         """;
 }

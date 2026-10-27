@@ -42,6 +42,7 @@ public sealed class InputExecutor : IDisposable
     private Gesture? _active;
     private long _timerToken;
     private bool _paused;
+    private bool _sessionLocked;
     private bool _blocked;
     private bool _disposed;
 
@@ -174,6 +175,23 @@ public sealed class InputExecutor : IDisposable
             if (paused && _active is { } gesture)
             {
                 Cancel(gesture, CancelReason.Paused);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Windows session locked or detached from the console (spec 41.11 item 7): releases immediately and
+    /// rejects new gestures as game_not_focused until unlocked. The foreground window is not a reliable
+    /// signal here: while the secure desktop is shown it can still report the game.
+    /// </summary>
+    public void SetSessionLocked(bool locked)
+    {
+        lock (_gate)
+        {
+            _sessionLocked = locked;
+            if (locked && _active is { } gesture)
+            {
+                Cancel(gesture, CancelReason.SessionLocked);
             }
         }
     }
@@ -336,6 +354,11 @@ public sealed class InputExecutor : IDisposable
         if (_active is not null)
         {
             return RejectReason.Busy;
+        }
+
+        if (_sessionLocked)
+        {
+            return RejectReason.GameNotFocused;
         }
 
         switch (_game.Check())

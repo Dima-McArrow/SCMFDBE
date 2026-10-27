@@ -36,6 +36,7 @@ internal sealed partial class ServerApp : IAsyncDisposable
     private readonly SemaphoreSlim _listenerSwitch = new(1, 1);
     private WssHost? _host;
     private MdnsAdvertiser? _mdns;
+    private SessionMonitor? _session;
     private LocalAddress? _boundAddress;
 
     public ServerApp(ServerStorage storage)
@@ -138,6 +139,7 @@ internal sealed partial class ServerApp : IAsyncDisposable
     {
         LogStarting(_logger, Version);
         GameMonitor.Start();
+        _session = new SessionMonitor(Executor, LoggerFactory.CreateLogger<SessionMonitor>());
         LogService.Start(Config.GameLogPath);
         NetworkChange.NetworkAddressChanged += OnNetworkChanged;
         await ApplyListenerAsync().ConfigureAwait(true);
@@ -157,6 +159,7 @@ internal sealed partial class ServerApp : IAsyncDisposable
         Executor.CancelAll(CancelReason.Shutdown);
         await StopListenerAsync().ConfigureAwait(false);
         LogService.Dispose();
+        _session?.Dispose();
         GameMonitor.Dispose();
         GameWindow.Dispose();
         Processor.Dispose();

@@ -53,7 +53,7 @@ dotnet publish src/Csmfd.Server -c Release -o publish   # publish/ is git-ignore
 |---|---|---|
 | `src/Csmfd.Protocol` | `net10.0` | Wire contract v2: strict `ClientMessageParser`, hand-written `ServerMessageWriter`, `ActionCatalog` (allowlist), `KeyNames`, `ProtocolLimits`, `StateModel`. No dependencies |
 | `src/Csmfd.Core` | `net10.0` | All logic, platform-neutral: `InputExecutor`, `CommandGate`, `ConnectionSession`, `ControllerRegistry`, `PairingService`, `StateStore`, `LogTailer` / `GameLogParser` / `GameLogProcessor`, `InputMonitor`. Talks to Windows only through `IInputSink`, `IGameWindow`, `IPhysicalKeyboard` |
-| `src/Csmfd.Server` | `net10.0-windows` | Composition (`ServerApp`), Kestrel/WSS (`WssHost`), config and storage, certificate and trust store, Win32 (`SendInput`, focus, WinEvent hook, mDNS), WinForms tray |
+| `src/Csmfd.Server` | `net10.0-windows` | Composition (`ServerApp`), Kestrel/WSS (`WssHost`), config and storage, certificate and trust store, Win32 (`SendInput`, focus, WinEvent hook, session lock, mDNS), WinForms tray |
 | `tests/Csmfd.Tests` | `net10.0-windows` | `Protocol/`, `Core/` (on fakes), `Server/` (Win32-pure checks and loopback WSS end-to-end), `Fixtures/` |
 | `tools/Csmfd.Probe` | `net10.0` | Dev client |
 
@@ -82,7 +82,31 @@ Protocol and input decisions never live in the tray or in `WssHost`.
 - Timer callbacks carry a token so a stale callback cannot release a newer gesture. Keep that pattern for new timers.
 - `ConnectionSession`: one receive loop, one send loop. The receive loop never waits for input, the log or the
   network; JSON handling never calls `SendInput` directly. Ack/error go before state; state is coalesced.
-- `ServerApp.StartAsync` runs on the UI thread (the WinEvent foreground hook needs its message loop).
+- `ServerApp.StartAsync` runs on the UI thread (the WinEvent foreground hook and `SystemEvents` need its
+  message loop).
+
+## Safety release (spec 41.11 item 7)
+
+Every trigger ends in the executor; none of them sends Esc/Enter or any "recovery" input.
+
+| Trigger | Source | Executor call | Cancel reason |
+|---|---|---|---|
+| Game window loses focus | `GameMonitor` (WinEvent foreground hook) | `CancelAll` | `focus_lost` |
+| Game process exits or the log shows the session end | `GameMonitor` (2 s / 10 s presence check), `GameLogProcessor` (SystemQuit) | `CancelAll` | `game_ended` |
+| Session locked (Win+L) or detached (user switch, RDP disconnect, logoff) | `Win32/SessionMonitor` (`SystemEvents.SessionSwitch`) | `SetSessionLocked(true/false)` | `session_locked` |
+| ClearDriver, new ship context, log reset | `GameLogProcessor` | `CancelAll` | `ship_context_changed` |
+| Tray "Pause input" | `TrayContext` | `SetPaused` | `paused` |
+| Disconnect, heartbeat timeout or slow client, client replaced, revoke | `ConnectionSession` / `ControllerRegistry` | `CancelConnection` | `disconnected` / `watchdog` / `client_replaced` / `revoked` |
+| Tap without `up` for 10 s | executor timer | — | `auto_released` (`watchdog`) |
+| Listener stop, Quit | `ServerApp` | `CancelAll` | `disconnected` / `shutdown` |
+
+- While the session is locked or detached, new gestures are rejected as `game_not_focused` (no new wire reason).
+  Do not rely on the foreground window for this: with the secure desktop up it can still report the game.
+- Lock and detach are two flags in `SessionMonitor`; input reopens only when both are clear (after a fast user
+  switch, `ConsoleConnect` arrives while the lock screen is still shown).
+- `SystemEvents` keeps static handlers: anything that subscribes must unsubscribe in `Dispose`.
+- A new trigger goes through an executor method with a Core test on fakes; only the OS subscription lives in
+  `Server/Win32`.
 
 ## Protocol
 

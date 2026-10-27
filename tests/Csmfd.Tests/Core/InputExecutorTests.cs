@@ -178,6 +178,44 @@ public sealed class InputExecutorTests : IDisposable
     }
 
     [Fact]
+    public void SessionLockReleasesActiveInputWithSessionLockedReason()
+    {
+        var hold = Submit("quantumEngage", KeyPhase.Hold, ms: 1500);
+        _time.Advance(TimeSpan.FromMilliseconds(200));
+        _executor.SetSessionLocked(true);
+
+        Assert.Equal(["0:mouse1v", "200:mouse1^"], _sink.Timeline);
+        Assert.Equal([(Connection, ErrorCode.InputCancelled, hold, CancelReason.SessionLocked)], _output.Errors);
+        Assert.False(_executor.HasActiveInput);
+    }
+
+    [Fact]
+    public void LockedSessionRejectsNewGesturesEvenIfTheGameLooksFocused()
+    {
+        // The secure desktop can leave the game as the foreground window: the lock flag decides.
+        _executor.SetSessionLocked(true);
+
+        var tap = Submit("lights", KeyPhase.Down);
+        var chat = Chat("/wave");
+
+        Assert.Equal((AckStatus.Rejected, RejectReason.GameNotFocused), _output.AckFor(tap));
+        Assert.Equal((AckStatus.Rejected, RejectReason.GameNotFocused), _output.AckFor(chat));
+        Assert.Empty(_sink.Timeline);
+    }
+
+    [Fact]
+    public void UnlockedSessionAcceptsInputAgain()
+    {
+        _executor.SetSessionLocked(true);
+        _executor.SetSessionLocked(false);
+
+        var tap = Submit("lights", KeyPhase.Down);
+
+        Assert.Equal(AckStatus.Sent, _output.AckFor(tap).Status);
+        Assert.Equal(["0:lv"], _sink.Timeline);
+    }
+
+    [Fact]
     public void SafetyCancelBypassesTapMinimum()
     {
         var down = Submit("requestLanding", KeyPhase.Down);

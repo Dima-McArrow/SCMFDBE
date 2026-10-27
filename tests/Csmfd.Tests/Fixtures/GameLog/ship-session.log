@@ -1,0 +1,15 @@
+<2026-10-26T15:48:45.358Z> BackupNameAttachment=" Build(12913470) 26 Oct 26 (16 48 35)"  -- used by backup system
+<2026-10-26T15:55:58.056Z> [Notice] <CEntityComponentShipListProvider::SetVehicleSpawningInformations> SetVehicleSpawningInformations - VehicleEntityId: [903627021939], LandingArea: Test_Pilot's
+<2026-10-26T15:55:58.056Z> Small Hangar [Team_GameServices][ASOP]
+<2026-10-26T15:56:32.460Z> [Notice] <SHUDEvent_OnNotification> Added notification "You have joined channel 'Drake Cutter Rambler : Test_Pilot'.
+<2026-10-26T15:56:32.460Z> : " [9] to queue. New queue size: 1, MissionId: [00000000-0000-0000-0000-000000000000], ObjectiveId: [] [Team_CoreGameplayFeatures][Missions][Comms]
+<2026-10-26T15:56:32.460Z>    "You have joined channel 'Drake Cutter Rambler : Test_Pilot'.
+<2026-10-26T15:56:52.708Z> [Notice] <Failed to get starmap route data!> [ItemNavigation][CL][24180] | NOT AUTH | DRAK_Cutter_Rambler_903627021939[903627021939]|CSCItemNavigation::GetStarmapRouteSegmentData|No Route loaded! [Team_CGP4][QuantumTravel]
+<2026-10-26T15:56:53.896Z> [Notice] <SHUDEvent_OnNotification> Added notification "Hangar Request Completed: " [10] to queue. New queue size: 1, MissionId: [00000000-0000-0000-0000-000000000000], ObjectiveId: [] [Team_CoreGameplayFeatures][Missions][Comms]
+<2026-10-26T15:56:53.896Z>    "Hangar Request Completed: " [10]
+<2026-10-26T15:57:10.000Z> [Notice] <Player Selected Quantum Target - Local> [ItemNavigation][CL][4976] | NOT AUTH | DRAK_Cutter_Rambler_903627021939[903627021939]|CSCItemNavigation::OnPlayerSelectedQuantumTarget|Player has selected point Stanton4a as their destination, routing locally [Team_CGP4][QuantumTravel]
+<2026-10-26T15:57:20.000Z> [Notice] <Player Selected Quantum Target - Local> [ItemNavigation][CL][4976] | NOT AUTH | MRAI_Guardian_MX_Collector_Military_902412078691[902412078691]|CSCItemNavigation::OnPlayerSelectedQuantumTarget|Player has selected point rs_ext_pyro6_leo as their destination, routing locally [Team_CGP4][QuantumTravel]
+<2026-10-26T15:58:00.000Z> [Notice] <Vehicle Control Flow> CVehicleMovementBase::ClearDriver: Local client node [100000000001] releasing control token for 'RSI_Perseus_901556573221' [901556573221] [Team_CGP4][Vehicle]
+<2026-10-26T15:58:41.704Z> [Notice] <Vehicle Control Flow> CVehicleMovementBase::ClearDriver: Local client node [100000000001] releasing control token for 'DRAK_Cutter_Rambler_903627021939' [903627021939] [Team_CGP4][Vehicle]
+<2026-10-26T15:59:07.165Z> [Notice] <Channel Disconnected> cause=30016 reason="Remote Disconnect - Player requested disconnect" frame=22903 isRemote=1 viewState=eCVS_InGame map="megamap" gamerules="SC_Default" hostType="Replicant" nickname="Test_Pilot" playerGEID=100000000001 [Team_Network][Network][Gateway][Disconnection]
+<2026-10-26T15:59:20.289Z> [Notice] <SystemQuit> CSystem::Quit invoked with - cause=30016, reason=Quit via console command, exitCode=0, thread id=2452, main thread id=2452 [Team_Unknown][System]

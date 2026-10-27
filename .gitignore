@@ -484,3 +484,8 @@ $RECYCLE.BIN/
 # Local publish output
 publish/
 
+
+# Project files hidden by template rules above (Win32/ build folders, *.log)
+!src/Csmfd.Server/Win32/
+!tests/Csmfd.Tests/Fixtures/**/*.log
+

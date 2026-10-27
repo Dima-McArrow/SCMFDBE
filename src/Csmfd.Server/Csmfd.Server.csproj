@@ -13,4 +13,8 @@
     <ProjectReference Include="..\Csmfd.Protocol\Csmfd.Protocol.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" />
+  </ItemGroup>
+
 </Project>

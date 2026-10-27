@@ -25,7 +25,7 @@ internal sealed partial class TrayContext : ApplicationContext
         _app = app ?? throw new ArgumentNullException(nameof(app));
         _menu = new ContextMenuStrip();
         _ui = SynchronizationContext.Current ?? new WindowsFormsSynchronizationContext();
-        _iconImage = CreateIcon();
+        _iconImage = AppIcon.Load(SystemInformation.SmallIconSize);
         _icon = new NotifyIcon { Icon = _iconImage, ContextMenuStrip = _menu, Visible = true, Text = "CSMFD Server" };
         _menu.Opening += (_, _) => RebuildMenu();
         _icon.DoubleClick += (_, _) => OpenPairing();
@@ -64,26 +64,6 @@ internal sealed partial class TrayContext : ApplicationContext
         }
 
         base.Dispose(disposing);
-    }
-
-    private static Icon CreateIcon()
-    {
-        using var bitmap = new Bitmap(32, 32);
-        using (var graphics = Graphics.FromImage(bitmap))
-        {
-            graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
-            graphics.Clear(Color.Transparent);
-            using var frame = new Pen(Color.FromArgb(0, 200, 255), 3);
-            graphics.DrawRectangle(frame, 3, 3, 26, 26);
-            using var font = new Font(FontFamily.GenericSansSerif, 10f, FontStyle.Bold, GraphicsUnit.Pixel);
-            TextRenderer.DrawText(graphics, "MFD", font, new Rectangle(0, 0, 32, 32), Color.White, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
-        }
-
-        var handle = bitmap.GetHicon();
-        using var temporary = Icon.FromHandle(handle);
-        var icon = (Icon)temporary.Clone();
-        Csmfd.Server.Win32.NativeMethods.DestroyIcon(handle);
-        return icon;
     }
 
     private async Task StartAsync()
@@ -222,7 +202,7 @@ internal sealed partial class TrayContext : ApplicationContext
             return;
         }
 
-        _pairing = new PairingForm(_app, address);
+        _pairing = new PairingForm(_app, address) { Icon = _iconImage };
         _pairing.FormClosed += (_, _) =>
         {
             _pairing?.Dispose();

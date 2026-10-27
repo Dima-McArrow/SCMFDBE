@@ -11,6 +11,8 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <Version>0.1.0</Version>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <!-- Exe icon (Explorer, taskbar, Alt+Tab); source artwork is Assets/csmfd.svg. -->
+    <ApplicationIcon>Assets\csmfd.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
@@ -20,6 +22,11 @@
   <ItemGroup>
     <ProjectReference Include="..\Csmfd.Core\Csmfd.Core.csproj" />
     <ProjectReference Include="..\Csmfd.Protocol\Csmfd.Protocol.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Same icon for the tray and windows, loaded at the size Windows asks for. -->
+    <EmbeddedResource Include="Assets\csmfd.ico" LogicalName="Csmfd.Server.Assets.csmfd.ico" />
   </ItemGroup>
 
   <ItemGroup>

@@ -46,10 +46,6 @@ internal static partial class NativeMethods
     public static partial short GetAsyncKeyState(int virtualKey);
 
     [LibraryImport("user32.dll")]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    public static partial bool DestroyIcon(nint icon);
-
-    [LibraryImport("user32.dll")]
     public static partial nint SetWinEventHook(uint eventMin, uint eventMax, nint module, nint callback, uint processId, uint threadId, uint flags);
 
     [LibraryImport("user32.dll")]

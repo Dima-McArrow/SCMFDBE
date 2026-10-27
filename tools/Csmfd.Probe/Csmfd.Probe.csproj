@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Development client that plays the iPad: pinned TLS, handshake, ping, one allowed command. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>csmfd-probe</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Csmfd.Protocol\Csmfd.Protocol.csproj" />
+  </ItemGroup>
+
+</Project>

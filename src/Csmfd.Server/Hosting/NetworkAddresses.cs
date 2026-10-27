@@ -26,8 +26,24 @@ internal static class NetworkAddresses
                 continue;
             }
 
-            var properties = network.GetIPProperties();
-            var index = properties.GetIPv4Properties()?.Index ?? -1;
+            // GetIPv4Properties throws (10043) for adapters without IPv4 instead of returning null.
+            if (!network.Supports(NetworkInterfaceComponent.IPv4))
+            {
+                continue;
+            }
+
+            IPInterfaceProperties properties;
+            int index;
+            try
+            {
+                properties = network.GetIPProperties();
+                index = properties.GetIPv4Properties()?.Index ?? -1;
+            }
+            catch (NetworkInformationException)
+            {
+                continue;
+            }
+
             var looksLikeVpn = network.NetworkInterfaceType == NetworkInterfaceType.Ppp
                                || VpnMarkers.Any(marker =>
                                    network.Description.Contains(marker, StringComparison.OrdinalIgnoreCase)

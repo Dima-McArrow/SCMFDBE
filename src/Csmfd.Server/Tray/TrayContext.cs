@@ -9,7 +9,7 @@ namespace Csmfd.Server.Tray;
 /// The only UI (spec 41.16): status, network choice, pairing, revoke, pause, firewall help,
 /// data folder and quit. No network administration surface exists.
 /// </summary>
-internal sealed class TrayContext : ApplicationContext
+internal sealed partial class TrayContext : ApplicationContext
 {
     private readonly ServerApp _app;
     private readonly NotifyIcon _icon;
@@ -38,7 +38,19 @@ internal sealed class TrayContext : ApplicationContext
             "Releasing a key failed. Check that no key is stuck, then choose \"Re-enable input\".",
             ToolTipIcon.Warning));
 
+        // A tray app must never block on the default .NET exception dialog: log it and notify instead.
+        _unhandledLogger = _app.LoggerFactory.CreateLogger("Unhandled");
+        Application.ThreadException += OnThreadException;
+
         _ui.Post(async _ => await StartAsync().ConfigureAwait(true), null);
+    }
+
+    private readonly Microsoft.Extensions.Logging.ILogger _unhandledLogger;
+
+    private void OnThreadException(object? sender, ThreadExceptionEventArgs e)
+    {
+        LogUnhandled(_unhandledLogger, e.Exception);
+        _icon.ShowBalloonTip(8000, "CSMFD Server", "Unexpected error: " + e.Exception.Message + " (see logs)", ToolTipIcon.Error);
     }
 
     protected override void Dispose(bool disposing)
@@ -257,4 +269,7 @@ internal sealed class TrayContext : ApplicationContext
     }
 
     private void Post(Action action) => _ui.Post(_ => action(), null);
+
+    [Microsoft.Extensions.Logging.LoggerMessage(Level = Microsoft.Extensions.Logging.LogLevel.Error, Message = "Unhandled UI exception")]
+    private static partial void LogUnhandled(Microsoft.Extensions.Logging.ILogger logger, Exception exception);
 }

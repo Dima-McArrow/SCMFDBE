@@ -43,7 +43,9 @@ internal sealed partial class ServerApp : IAsyncDisposable
         Storage = storage ?? throw new ArgumentNullException(nameof(storage));
         Config = storage.LoadConfig();
         LoggerFactory = Microsoft.Extensions.Logging.LoggerFactory.Create(builder =>
-            builder.SetMinimumLevel(LogLevel.Information).AddProvider(new FileLoggerProvider(storage.LogDirectory)));
+            builder.SetMinimumLevel(LogLevel.Information)
+                .AddFilter("Microsoft", LogLevel.Warning) // hosting chatter includes full local paths (spec 41.16)
+                .AddProvider(new FileLoggerProvider(storage.LogDirectory)));
         _logger = LoggerFactory.CreateLogger<ServerApp>();
 
         var time = TimeProvider.System;
@@ -152,6 +154,7 @@ internal sealed partial class ServerApp : IAsyncDisposable
         await StopListenerAsync().ConfigureAwait(false);
         LogService.Dispose();
         GameMonitor.Dispose();
+        GameWindow.Dispose();
         Processor.Dispose();
         Executor.Dispose();
         Certificate.Dispose();

@@ -30,6 +30,8 @@ internal sealed class ServerStorage(string directory)
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = true,
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        PropertyNameCaseInsensitive = true, // hand-edited files may use any casing
         Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) },
     };
 

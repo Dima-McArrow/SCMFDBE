@@ -1,5 +1,5 @@
-# Normalize line endings in the repository; checkout follows the platform default.
-* text=auto
+# Normalize line endings: LF in the repository and in every working copy (Windows and Mac alike).
+* text=auto eol=lf
 
 # Game.log fixtures must stay byte-exact (CRLF, partial UTF-8, etc. are test inputs).
 tests/**/Fixtures/**/*.log binary

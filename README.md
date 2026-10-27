@@ -67,6 +67,32 @@ Re-enable input (only after a failed release) · Copy firewall command · Open d
 | Win32 | `SendInput` scan codes / MOUSEINPUT / KEYEVENTF_UNICODE, image-path focus check, WinEvent foreground hook, no keyboard polling |
 | Game.log (41.13, 41.14) | `LogTailer` (EOF start, byte offsets, generations), `GameLogParser` (verified lines of build 12913470), `GameLogProcessor` (ship context, QT target, ATC with watermark) |
 
+## Measured on the gaming PC (2026-10-27, game not running)
+
+Release build, `CSMFD_DATA_DIR` dev instance, LAN 192.168.1.67, client = `tools/csmfd-probe`.
+Targets from spec 41.15 in parentheses. CPU is "% of one logical core" (CPU time / wall time).
+
+| Metric | Result |
+|---|---|
+| Idle CPU, warm (after 3 min), 120 s | 0.052% (< 0.5%) |
+| Idle CPU, first 2 min after start | ~0.8%: one-time .NET tiered JIT warm-up |
+| Idle CPU with a connected client pinging every 5 s | 0.68% measured during warm-up, same order as above |
+| Private bytes | 23–27 MiB (< 100 MiB), stable after reconnects and a 117 MiB log burst |
+| Log burst: real 117 MiB archive appended at once | whole server used ~1.3 CPU-s; parsed to the end, `ready`, 16 context transitions |
+| Ping RTT over LAN | 1.6–2.9 ms |
+| Command → ack (rejected path, includes process check) | 13 ms |
+
+Not yet measured: in-game frametime impact, real `SendInput` latency into the game, 2 h soak.
+
+Dev client:
+
+```powershell
+csmfd-probe --host <ip> --print-fp                               # read the fingerprint (connection refused)
+csmfd-probe --host <ip> --fp <hex> --code <6 digits>             # pair (prints the token)
+csmfd-probe --host <ip> --fp <hex> --token <token> --action lights  # one allowlisted command
+csmfd-probe --host <ip> --fp <hex> --token <token> --stay 120       # idle client, ping every 5 s
+```
+
 ## Known limits (honest list)
 
 - Ship control is **assumed** from the ship channel join; ClearDriver ends it. No confirmed seat state exists.

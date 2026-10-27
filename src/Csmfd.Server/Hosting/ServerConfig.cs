@@ -33,8 +33,11 @@ internal sealed class ServerStorage(string directory)
         Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) },
     };
 
+    /// <summary>%LocalAppData%\CSMFD, or CSMFD_DATA_DIR for development runs that must not touch real data.</summary>
     public static ServerStorage Default { get; } = new(
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "CSMFD"));
+        Environment.GetEnvironmentVariable("CSMFD_DATA_DIR") is { Length: > 0 } overridden
+            ? overridden
+            : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "CSMFD"));
 
     public string Directory { get; } = directory;
 

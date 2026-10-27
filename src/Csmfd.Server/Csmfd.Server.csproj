@@ -26,4 +26,8 @@
     <InternalsVisibleTo Include="Csmfd.Tests" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="QRCoder" />
+  </ItemGroup>
+
 </Project>

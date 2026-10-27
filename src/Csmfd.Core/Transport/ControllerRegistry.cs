@@ -10,6 +10,8 @@ public interface IControllerConnection
 
     Guid DeviceId { get; }
 
+    string DeviceName { get; }
+
     /// <summary>Queues an already serialized message; must not block.</summary>
     void EnqueueControl(byte[] frame);
 

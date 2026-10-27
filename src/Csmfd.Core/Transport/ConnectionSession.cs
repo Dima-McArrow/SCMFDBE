@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Net.WebSockets;
 using System.Text.Unicode;
+using Csmfd.Core.Diagnostics;
 using Csmfd.Core.Input;
 using Csmfd.Core.Security;
 using Csmfd.Core.State;
@@ -55,6 +56,7 @@ public sealed partial class ConnectionSession : IControllerConnection, IDisposab
     private readonly ServerIdentity _identity;
     private readonly SessionLimits _limits;
     private readonly ILogger _logger;
+    private readonly InputMonitor? _monitor;
     private readonly CommandGate _gate;
     private readonly ConcurrentQueue<byte[]> _control = new();
     private readonly SemaphoreSlim _signal = new(0);
@@ -86,7 +88,8 @@ public sealed partial class ConnectionSession : IControllerConnection, IDisposab
         StateStore store,
         ServerIdentity identity,
         ILogger logger,
-        SessionLimits? limits = null)
+        SessionLimits? limits = null,
+        InputMonitor? monitor = null)
     {
         _socket = socket ?? throw new ArgumentNullException(nameof(socket));
         _time = time ?? throw new ArgumentNullException(nameof(time));
@@ -97,6 +100,7 @@ public sealed partial class ConnectionSession : IControllerConnection, IDisposab
         _identity = identity ?? throw new ArgumentNullException(nameof(identity));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _limits = limits ?? new SessionLimits();
+        _monitor = monitor;
         _gate = new CommandGate(time);
         _startedAt = time.GetTimestamp();
         _rateWindowStart = _startedAt;
@@ -260,6 +264,7 @@ public sealed partial class ConnectionSession : IControllerConnection, IDisposab
                 return;
 
             case ParseFailureKind.CommandRejected when IsAuthenticated:
+                _monitor?.Result(failure.CommandId!.Value, AckStatus.Rejected, failure.Reason);
                 EnqueueControl(ServerMessageWriter.Ack(failure.CommandId!.Value, AckStatus.Rejected, failure.Reason));
                 break;
 
@@ -361,8 +366,10 @@ public sealed partial class ConnectionSession : IControllerConnection, IDisposab
                 break;
 
             case CommandMessage command:
+                _monitor?.Received(_deviceName, command);
                 if (_gate.Admit(command) is { } rejection)
                 {
+                    _monitor?.Result(command.Id, AckStatus.Rejected, rejection);
                     EnqueueControl(ServerMessageWriter.Ack(command.Id, AckStatus.Rejected, rejection));
                     break;
                 }

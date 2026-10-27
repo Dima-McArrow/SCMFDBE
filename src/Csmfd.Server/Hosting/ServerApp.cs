@@ -50,11 +50,12 @@ internal sealed partial class ServerApp : IAsyncDisposable
 
         var time = TimeProvider.System;
         Store = new StateStore();
-        Registry = new ControllerRegistry();
+        Monitor = new Csmfd.Core.Diagnostics.InputMonitor(time);
+        Registry = new ControllerRegistry { Monitor = Monitor };
         GameWindow = new Win32GameWindow(Config.GameExePath, LoggerFactory.CreateLogger<Win32GameWindow>());
         Executor = new InputExecutor(
             time,
-            new Win32InputSink(),
+            new Csmfd.Core.Diagnostics.ObservedInputSink(new Win32InputSink(), Monitor),
             GameWindow,
             new Win32PhysicalKeyboard(),
             LoadEmotes(storage),
@@ -77,7 +78,7 @@ internal sealed partial class ServerApp : IAsyncDisposable
         Fingerprint = ServerCertificateStore.Fingerprint(Certificate);
         Version = typeof(ServerApp).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion.Split('+')[0] ?? "0.0.0";
         Identity = new ServerIdentity(Config.ServerId, ServerName, Version, Config.ChatKey);
-        Services = new ConnectionServices(time, Pairing, Registry, Executor, Store, Identity, LoggerFactory);
+        Services = new ConnectionServices(time, Pairing, Registry, Executor, Store, Identity, LoggerFactory, Monitor: Monitor);
     }
 
     public event Action? ListenerChanged;
@@ -93,6 +94,9 @@ internal sealed partial class ServerApp : IAsyncDisposable
     public ControllerRegistry Registry { get; }
 
     public InputExecutor Executor { get; }
+
+    /// <summary>Local debug view of received commands and injected input (tray \"Input monitor\").</summary>
+    public Csmfd.Core.Diagnostics.InputMonitor Monitor { get; }
 
     public PairingService Pairing { get; }
 

@@ -104,6 +104,37 @@ public sealed class WssEndToEndTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task InputMonitorShowsCommandInjectionAndResultInOrder()
+    {
+        var monitor = _server.Services.Monitor!;
+        monitor.Enabled = true;
+        var (client, _) = await _server.PairAsync("Dima iPad");
+        using (client)
+        {
+            await client.SendAsync("""{"v":2,"type":"key","id":"ad88b2ad-d306-443a-8524-155575227708","action":"requestLanding","phase":"down","key":"n","mods":["alt"]}""");
+            await client.ReceiveTypeAsync("ack");
+            await client.SendAsync("""{"v":2,"type":"key","id":"bd88b2ad-d306-443a-8524-155575227708","action":"lights","phase":"down","key":"l"}""");
+            await client.ReceiveTypeAsync("ack");
+        }
+
+        var entries = new List<Csmfd.Core.Diagnostics.MonitorEntry>();
+        while (monitor.TryDequeue(out var entry))
+        {
+            entries.Add(entry);
+        }
+
+        Assert.Equal(
+            [
+                "ad88b2ad Dima iPad: requestLanding  Alt+N  down",
+                " Alt↓ N↓",
+                "ad88b2ad sent",
+                "bd88b2ad Dima iPad: lights  L  down",
+                "bd88b2ad rejected (busy)",
+            ],
+            entries.Take(5).Select(e => $"{e.Ref} {e.Text}"));
+    }
+
+    [Fact]
     public async Task DuplicateCommandIdIsNotExecutedTwice()
     {
         var (client, _) = await _server.PairAsync();

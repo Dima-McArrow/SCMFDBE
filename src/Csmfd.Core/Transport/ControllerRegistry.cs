@@ -1,3 +1,4 @@
+using Csmfd.Core.Diagnostics;
 using Csmfd.Core.Input;
 using Csmfd.Protocol;
 
@@ -45,6 +46,9 @@ public sealed class ControllerRegistry : IExecutorOutput
     public event Action<IControllerConnection?>? ControllerChanged;
 
     public IControllerConnection? Controller => Volatile.Read(ref _controller);
+
+    /// <summary>Optional local input monitor (tray debug window).</summary>
+    public InputMonitor? Monitor { get; set; }
 
     /// <summary>Breaks the construction cycle: the executor needs this registry as its output.</summary>
     public void Attach(InputExecutor executor) => _executor = executor ?? throw new ArgumentNullException(nameof(executor));
@@ -133,11 +137,17 @@ public sealed class ControllerRegistry : IExecutorOutput
         }
     }
 
-    public void Ack(Guid connectionId, Guid commandId, AckStatus status, RejectReason? reason = null) =>
+    public void Ack(Guid connectionId, Guid commandId, AckStatus status, RejectReason? reason = null)
+    {
+        Monitor?.Result(commandId, status, reason);
         Find(connectionId)?.EnqueueControl(ServerMessageWriter.Ack(commandId, status, reason));
+    }
 
-    public void InputError(Guid connectionId, ErrorCode code, Guid commandId, CancelReason reason) =>
+    public void InputError(Guid connectionId, ErrorCode code, Guid commandId, CancelReason reason)
+    {
+        Monitor?.Cancelled(commandId, code, reason);
         Find(connectionId)?.EnqueueControl(ServerMessageWriter.Error(code, MessageFor(code), commandId, reason));
+    }
 
     public void InputStarted(Guid connectionId, Guid commandId, ActionSpec spec) =>
         InputStartedNotified?.Invoke(commandId, spec);

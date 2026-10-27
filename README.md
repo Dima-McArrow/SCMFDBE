@@ -44,7 +44,11 @@ Discovery is a convenience; the fingerprint is never taken from mDNS and manual 
 ## Tray
 
 Status · Pair iPad · Network · Trusted devices (revoke one / all) · Pause input (releases immediately) ·
-Re-enable input (only after a failed release) · Copy firewall command · Open data folder · Quit.
+Re-enable input (only after a failed release) · Input monitor · Copy firewall command · Open data folder · Quit.
+
+**Input monitor** (debug window): every command received from the iPad, its result (sent / rejected with reason /
+ignored, server-side releases) and the exact events handed to SendInput (e.g. `Alt↓ N↓ … N↑ Alt↑`). It records only while
+the window is open, keeps at most 2000 pending entries in memory, never writes to disk and is not reachable over the network.
 
 ## Data (`%LocalAppData%\CSMFD`, current user only)
 

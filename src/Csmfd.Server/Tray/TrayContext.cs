@@ -17,6 +17,7 @@ internal sealed partial class TrayContext : ApplicationContext
     private readonly SynchronizationContext _ui;
     private readonly Icon _iconImage;
     private PairingForm? _pairing;
+    private InputMonitorForm? _inputMonitor;
     private bool _paused;
     private bool _quitting;
 
@@ -61,6 +62,7 @@ internal sealed partial class TrayContext : ApplicationContext
             _menu.Dispose();
             _iconImage.Dispose();
             _pairing?.Dispose();
+            _inputMonitor?.Dispose();
         }
 
         base.Dispose(disposing);
@@ -131,6 +133,7 @@ internal sealed partial class TrayContext : ApplicationContext
         }
 
         _menu.Items.Add(new ToolStripSeparator());
+        _menu.Items.Add(new ToolStripMenuItem("Input monitor…", null, (_, _) => OpenInputMonitor()));
         _menu.Items.Add(new ToolStripMenuItem("Copy firewall command", null, (_, _) => CopyFirewallCommand()));
         _menu.Items.Add(new ToolStripMenuItem("Open data folder", null, (_, _) => OpenFolder(_app.Storage.Directory)));
         _menu.Items.Add(new ToolStripSeparator());
@@ -211,6 +214,23 @@ internal sealed partial class TrayContext : ApplicationContext
         _pairing.Show();
     }
 
+    private void OpenInputMonitor()
+    {
+        if (_inputMonitor is { IsDisposed: false })
+        {
+            _inputMonitor.Activate();
+            return;
+        }
+
+        _inputMonitor = new InputMonitorForm(_app.Monitor) { Icon = _iconImage };
+        _inputMonitor.FormClosed += (_, _) =>
+        {
+            _inputMonitor?.Dispose();
+            _inputMonitor = null;
+        };
+        _inputMonitor.Show();
+    }
+
     private void TogglePause()
     {
         _paused = !_paused;
@@ -244,6 +264,7 @@ internal sealed partial class TrayContext : ApplicationContext
         _quitting = true;
         _icon.Visible = false;
         _pairing?.Close();
+        _inputMonitor?.Close();
         await _app.DisposeAsync().ConfigureAwait(true);
         ExitThread();
     }

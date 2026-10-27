@@ -24,7 +24,8 @@ internal sealed record ConnectionServices(
     StateStore Store,
     ServerIdentity Identity,
     ILoggerFactory LoggerFactory,
-    SessionLimits? Limits = null);
+    SessionLimits? Limits = null,
+    Csmfd.Core.Diagnostics.InputMonitor? Monitor = null);
 
 /// <summary>
 /// Minimal Kestrel host (spec 41.3, 41.4): one explicit IPv4 address, TLS 1.2+ only, the single
@@ -154,7 +155,8 @@ internal sealed partial class WssHost : IAsyncDisposable
                 services.Store,
                 services.Identity,
                 sessionLogger,
-                services.Limits);
+                services.Limits,
+                services.Monitor);
             await session.RunAsync(context.RequestAborted).ConfigureAwait(false);
         }
     }

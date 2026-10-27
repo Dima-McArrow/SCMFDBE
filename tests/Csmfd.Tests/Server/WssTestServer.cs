@@ -4,6 +4,7 @@ using System.Net.WebSockets;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Text.Json.Nodes;
+using Csmfd.Core.Diagnostics;
 using Csmfd.Core.Input;
 using Csmfd.Core.Security;
 using Csmfd.Core.State;
@@ -56,8 +57,9 @@ internal sealed class WssTestServer : IAsyncDisposable
 
         var sink = new FakeInputSink(time);
         var game = new FakeGameWindow();
-        var registry = new ControllerRegistry();
-        var executor = new InputExecutor(time, sink, game, new FakeKeyboard(), new EmoteAllowlist(["wave"]), registry);
+        var monitor = new InputMonitor(time);
+        var registry = new ControllerRegistry { Monitor = monitor };
+        var executor = new InputExecutor(time, new ObservedInputSink(sink, monitor), game, new FakeKeyboard(), new EmoteAllowlist(["wave"]), registry);
         registry.Attach(executor);
         var pairing = new PairingService(time, new MemoryTrustStore());
         pairing.DeviceRevoked += registry.OnDeviceRevoked;
@@ -70,7 +72,8 @@ internal sealed class WssTestServer : IAsyncDisposable
             new StateStore(),
             new ServerIdentity(Guid.NewGuid(), "CSMFD-Server", "0.1.0", ChatKey.Enter),
             NullLoggerFactory.Instance,
-            limits);
+            limits,
+            monitor);
 
         var port = FreePort();
         var host = await WssHost.StartAsync(IPAddress.Loopback, port, certificate, services, CancellationToken.None);

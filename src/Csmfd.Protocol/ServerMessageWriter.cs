@@ -103,6 +103,90 @@ public static class ServerMessageWriter
         });
     }
 
+    public static byte[] Activity(Guid sessionId, ActivityPage page)
+    {
+        ArgumentNullException.ThrowIfNull(page);
+        RequireCounter(page.LatestSeq, nameof(page));
+        if (page.FirstSeq < 1 || page.FirstSeq > page.LatestSeq + 1 || page.Events.Count > ActivityLimits.PageSize
+            || (page.Events.Count == 0 && page.LatestSeq != 0))
+        {
+            throw new ArgumentException("Invalid activity page bounds.", nameof(page));
+        }
+
+        return Write(MessageTypes.Activity, writer =>
+        {
+            writer.WriteString("sessionId", sessionId);
+            writer.WriteString("streamId", page.StreamId);
+            WriteTimestamp(writer, "startedAt", page.StartedAt);
+            writer.WriteNumber("firstSeq", page.FirstSeq);
+            writer.WriteNumber("latestSeq", page.LatestSeq);
+            writer.WriteBoolean("ended", page.Ended);
+            writer.WriteStartArray("events");
+            long previous = 0;
+            foreach (var item in page.Events)
+            {
+                if (item.Seq < page.FirstSeq || item.Seq > page.LatestSeq || item.Seq <= previous
+                    || !ActivityKinds.Contains(item.Kind))
+                {
+                    throw new ArgumentException("Invalid activity event.", nameof(page));
+                }
+
+                if (!TextRules.IsValidText(item.Text, 0, ActivityLimits.TextScalars))
+                {
+                    throw new ArgumentException("Invalid activity text.", nameof(page));
+                }
+                if (item.ObjectiveId is { } objective)
+                {
+                    RequireText(objective, ActivityLimits.ObjectiveScalars, nameof(page));
+                }
+
+                if (item.Kind == "reward" ? item.Amount is not (> 0 and <= 1_000_000_000) || item.Currency is not ("aUEC" or "UEC")
+                    : item.Amount is not null || item.Currency is not null)
+                {
+                    throw new ArgumentException("Invalid reward amount/currency.", nameof(page));
+                }
+
+                previous = item.Seq;
+                if (item.MissionId == Guid.Empty
+                    || (item.Kind is not ("reward" or "sessionEnded") && item.MissionId is null))
+                {
+                    throw new ArgumentException("A contract activity requires a nonzero mission ID.", nameof(page));
+                }
+
+                writer.WriteStartObject();
+                writer.WriteNumber("seq", item.Seq);
+                writer.WriteString("kind", item.Kind);
+                WriteTimestamp(writer, "at", item.At);
+                writer.WriteString("text", item.Text);
+                if (item.MissionId is { } mission)
+                {
+                    writer.WriteString("missionId", mission);
+                }
+
+                if (item.ObjectiveId is { } objectiveId)
+                {
+                    writer.WriteString("objectiveId", objectiveId);
+                }
+
+                if (item.Amount is { } amount)
+                {
+                    writer.WriteNumber("amount", amount);
+                    writer.WriteString("currency", item.Currency);
+                }
+
+                writer.WriteEndObject();
+            }
+
+            writer.WriteEndArray();
+        });
+    }
+
+    private static readonly HashSet<string> ActivityKinds = new(StringComparer.Ordinal)
+    {
+        "reward", "contractAccepted", "contractComplete", "contractWithdrawn", "contractFailed",
+        "newObjective", "objectiveComplete", "sessionEnded",
+    };
+
     public static byte[] FullState(Guid sessionId, long seq, StateSnapshot snapshot)
     {
         ArgumentNullException.ThrowIfNull(snapshot);

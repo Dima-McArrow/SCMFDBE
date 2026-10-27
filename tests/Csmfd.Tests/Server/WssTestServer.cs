@@ -48,7 +48,7 @@ internal sealed class WssTestServer : IAsyncDisposable
 
     public Uri Endpoint => new($"wss://127.0.0.1:{Port}{ProtocolLimits.EndpointPath}");
 
-    public static async Task<WssTestServer> StartAsync(SessionLimits? limits = null)
+    public static async Task<WssTestServer> StartAsync(SessionLimits? limits = null, bool activity = false)
     {
         var directory = Path.Combine(Path.GetTempPath(), "csmfd-tests", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);
@@ -64,16 +64,18 @@ internal sealed class WssTestServer : IAsyncDisposable
         var pairing = new PairingService(time, new MemoryTrustStore());
         pairing.DeviceRevoked += registry.OnDeviceRevoked;
 
+        var store = new StateStore();
         var services = new ConnectionServices(
             time,
             pairing,
             registry,
             executor,
-            new StateStore(),
+            store,
             new ServerIdentity(Guid.NewGuid(), "CSMFD-Server", "0.1.0", ChatKey.Enter),
             NullLoggerFactory.Instance,
             limits,
-            monitor);
+            monitor,
+            activity ? new Csmfd.Core.GameLog.ActivityJournal(time, store.Current.Log.Generation) : null);
 
         var port = FreePort();
         var host = await WssHost.StartAsync(IPAddress.Loopback, port, certificate, services, CancellationToken.None);

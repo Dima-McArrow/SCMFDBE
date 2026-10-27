@@ -21,6 +21,7 @@ public sealed partial class GameLogProcessor : IDisposable
     private const int MaxRemembered = 128;
     private const string RequestLandingAction = "requestLanding";
 
+    private readonly ActivityJournal? _activity;
     private readonly Lock _gate = new();
     private readonly StateStore _store;
     private readonly InputExecutor _executor;
@@ -46,7 +47,7 @@ public sealed partial class GameLogProcessor : IDisposable
     private HangarRequestState _hangarState = HangarRequestState.Idle;
     private long _hangarToken;
 
-    public GameLogProcessor(StateStore store, InputExecutor executor, TimeProvider time, Guid initialGeneration, Func<long> probeWatermark, ILogger? logger = null)
+    public GameLogProcessor(StateStore store, InputExecutor executor, TimeProvider time, Guid initialGeneration, Func<long> probeWatermark, ILogger? logger = null, ActivityJournal? activity = null)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _executor = executor ?? throw new ArgumentNullException(nameof(executor));
@@ -54,10 +55,12 @@ public sealed partial class GameLogProcessor : IDisposable
         _probeWatermark = probeWatermark ?? throw new ArgumentNullException(nameof(probeWatermark));
         _logger = logger ?? NullLogger.Instance;
         _generation = initialGeneration;
+        _activity = activity;
     }
 
     public void OnLine(LogLine line)
     {
+        _activity?.OnLine(line);
         var parsed = GameLogParser.Parse(line.Text);
         if (parsed is null)
         {
@@ -86,6 +89,7 @@ public sealed partial class GameLogProcessor : IDisposable
     /// <summary>The log was replaced/truncated/lost: nothing from before can be trusted (spec 41.14).</summary>
     public void OnGenerationReset(Guid generation)
     {
+        _activity?.Reset(generation);
         lock (_gate)
         {
             _generation = generation;
@@ -113,6 +117,7 @@ public sealed partial class GameLogProcessor : IDisposable
     /// <summary>The game process exited (from the process monitor).</summary>
     public void OnGameProcessExited()
     {
+        _activity?.End();
         bool changed;
         lock (_gate)
         {
@@ -216,6 +221,11 @@ public sealed partial class GameLogProcessor : IDisposable
                 return false;
 
             case GameSessionEnded ended:
+                if (line.Text.Contains("<SystemQuit>", StringComparison.Ordinal))
+                {
+                    _activity?.End();
+                }
+
                 return EndSession(ended.At);
 
             default:

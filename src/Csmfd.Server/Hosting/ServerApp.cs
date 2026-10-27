@@ -76,7 +76,8 @@ internal sealed partial class ServerApp : IAsyncDisposable
         Pairing.DeviceRevoked += Registry.OnDeviceRevoked;
 
         Tailer = new LogTailer(Config.GameLogPath);
-        Processor = new GameLogProcessor(Store, Executor, time, Tailer.Generation, Tailer.ProbeLength, LoggerFactory.CreateLogger<GameLogProcessor>());
+        var activity = new ActivityJournal(time, Tailer.Generation);
+        Processor = new GameLogProcessor(Store, Executor, time, Tailer.Generation, Tailer.ProbeLength, LoggerFactory.CreateLogger<GameLogProcessor>(), activity);
         Registry.InputStartedNotified += Processor.OnInputStarted;
 
         GameMonitor = new GameMonitor(GameWindow, Store, Executor, time, GameMonitor.ReadBuild(Config.GameExePath));
@@ -87,7 +88,7 @@ internal sealed partial class ServerApp : IAsyncDisposable
         Fingerprint = ServerCertificateStore.Fingerprint(Certificate);
         Version = typeof(ServerApp).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion.Split('+')[0] ?? "0.0.0";
         Identity = new ServerIdentity(Config.ServerId, ServerName, Version, Config.ChatKey);
-        Services = new ConnectionServices(time, Pairing, Registry, Executor, Store, Identity, LoggerFactory, Monitor: Monitor);
+        Services = new ConnectionServices(time, Pairing, Registry, Executor, Store, Identity, LoggerFactory, Monitor: Monitor, Activity: activity);
     }
 
     public event Action? ListenerChanged;

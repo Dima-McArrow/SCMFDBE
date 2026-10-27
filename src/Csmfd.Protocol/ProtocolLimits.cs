@@ -54,5 +54,6 @@ public static class MessageTypes
     public const string Pong = "pong";
     public const string Ack = "ack";
     public const string State = "state";
+    public const string Activity = "activity";
     public const string Error = "error";
 }

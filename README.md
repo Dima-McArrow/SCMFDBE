@@ -126,6 +126,7 @@ csmfd-probe --host <ip> --fp <hex> --token <token> --stay 120       # idle clien
 | Protocol v2, WSS/TLS with pinning, pairing, revoke | Implemented and tested; works with the iPad app over the LAN (2026-10-27) |
 | Commands from the iPad | Received, validated and shown in the Input monitor; in-game effect still to be verified |
 | Game.log: ship context, ClearDriver, QT target, ATC | Implemented; checked on real lines and a 117 MiB archive. The iPad does not consume this state yet |
+| Session rewards/contracts activity feed (41.21) | Implemented; bounded 256-event replay, four-event pages, no BE disk ledger. Build/WSS tests and read-only real-log replay checked; in-game coverage/frametime not measured |
 | Tray, network choice, pairing window, input monitor, icon | Working on the gaming PC |
 | In-game measurements (frametime, input latency, 2 h soak) | Not done |
 
@@ -141,3 +142,14 @@ csmfd-probe --host <ip> --fp <hex> --token <token> --stay 120       # idle clien
 - If the anti-cheat denies reading the game's image path, focus falls back to the process name (logged).
 - Chat `KEYEVENTF_UNICODE` typing, chat key toggling, hold durations and F8 still need in-game calibration.
 - Self-destruct is protected only by the iPad slider; a paired client can send the allowed hold directly.
+
+## Session rewards and contracts (protocol 41.21)
+
+The existing reader now extracts explicit reward amounts and observed contract/objective notifications.
+An authenticated iPad receives a bounded replay feed after welcome/full state, independently of coalesced ship
+state. Up to 256 events are retained in memory and sent four at a time; acks/errors and state keep priority.
+There is no extra reader/polling loop or PC ledger file. Totals, saved sessions and presentation belong to the iPad.
+
+Purchases, sales, rentals, fines and wallet balance are excluded. Starting the server at EOF does not recover
+earlier gameplay. Replay gaps are detectable; the feed is not a durable or complete financial record.
+See section 41.21 in the FE specification and `SESSION-REWARDS-CONTRACTS.md` in the FE root for Mac validation.

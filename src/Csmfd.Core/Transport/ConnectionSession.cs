@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Net.WebSockets;
 using System.Text.Unicode;
 using Csmfd.Core.Diagnostics;
+using Csmfd.Core.GameLog;
 using Csmfd.Core.Input;
 using Csmfd.Core.Security;
 using Csmfd.Core.State;
@@ -47,6 +48,11 @@ public sealed partial class ConnectionSession : IControllerConnection, IDisposab
     private const int StateAwaitPair = 1;
     private const int StateAuthenticated = 2;
 
+    private readonly ActivityJournal? _activity;
+    private Guid? _activityStream;
+    private long _activitySeq;
+    private int _activitySignaled;
+    private bool _activityCanSend;
     private readonly WebSocket _socket;
     private readonly TimeProvider _time;
     private readonly PairingService _pairing;
@@ -89,7 +95,8 @@ public sealed partial class ConnectionSession : IControllerConnection, IDisposab
         ServerIdentity identity,
         ILogger logger,
         SessionLimits? limits = null,
-        InputMonitor? monitor = null)
+        InputMonitor? monitor = null,
+        ActivityJournal? activity = null)
     {
         _socket = socket ?? throw new ArgumentNullException(nameof(socket));
         _time = time ?? throw new ArgumentNullException(nameof(time));
@@ -101,6 +108,7 @@ public sealed partial class ConnectionSession : IControllerConnection, IDisposab
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _limits = limits ?? new SessionLimits();
         _monitor = monitor;
+        _activity = activity;
         _gate = new CommandGate(time);
         _startedAt = time.GetTimestamp();
         _rateWindowStart = _startedAt;
@@ -404,6 +412,10 @@ public sealed partial class ConnectionSession : IControllerConnection, IDisposab
 
         _needsFull = true;
         _store.Changed += OnStateChanged;
+        if (_activity is not null)
+        {
+            _activity.Changed += OnActivityChanged;
+        }
         _signal.Release();
         LogAuthenticated(_logger, Id, device.Id);
     }
@@ -439,12 +451,25 @@ public sealed partial class ConnectionSession : IControllerConnection, IDisposab
                     Interlocked.Exchange(ref _stateReady, 0);
                     var (snapshot, seq) = _store.TakeFull();
                     await SendAsync(ServerMessageWriter.FullState(_store.SessionId, seq, snapshot), cancellationToken).ConfigureAwait(false);
+                    _activityCanSend = true;
                     LogStateSent(_logger, Id, seq, partial: false);
                 }
                 else if (Interlocked.Exchange(ref _stateReady, 0) == 1 && _store.TakeDelta() is { } delta)
                 {
                     await SendAsync(ServerMessageWriter.DeltaState(_store.SessionId, delta.Seq, delta.Delta), cancellationToken).ConfigureAwait(false);
                     LogStateSent(_logger, Id, delta.Seq, partial: true);
+                }
+
+                Interlocked.Exchange(ref _activitySignaled, 0);
+                if (_activityCanSend && _activity?.Read(_activityStream, _activitySeq) is { } activity)
+                {
+                    await SendAsync(ServerMessageWriter.Activity(_store.SessionId, activity), cancellationToken).ConfigureAwait(false);
+                    _activityStream = activity.StreamId;
+                    _activitySeq = activity.Events.Count > 0 ? activity.Events[^1].Seq : 0;
+                    if (_activitySeq < activity.LatestSeq)
+                    {
+                        OnActivityChanged();
+                    }
                 }
             }
         }
@@ -546,6 +571,10 @@ public sealed partial class ConnectionSession : IControllerConnection, IDisposab
     private void Shutdown()
     {
         _store.Changed -= OnStateChanged;
+        if (_activity is not null)
+        {
+            _activity.Changed -= OnActivityChanged;
+        }
         _debounceTimer.Dispose();
         LeaveUnauthenticatedSlot();
         var reason = Volatile.Read(ref _closeRequest) is { } close ? ReasonFor(close.Code) : CancelReason.Disconnected;
@@ -602,6 +631,21 @@ public sealed partial class ConnectionSession : IControllerConnection, IDisposab
         }
 
         return ++_rateWindowCount <= _limits.MaxMessagesPerSecond;
+    }
+
+    private void OnActivityChanged()
+    {
+        if (Volatile.Read(ref _closeRequest) is null && Interlocked.Exchange(ref _activitySignaled, 1) == 0)
+        {
+            try
+            {
+                _signal.Release();
+            }
+            catch (ObjectDisposedException)
+            {
+                // A reader callback already in flight when Shutdown unsubscribed is harmless.
+            }
+        }
     }
 
     private void OnStateChanged(bool urgent)

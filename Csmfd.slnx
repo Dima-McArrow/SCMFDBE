@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Csmfd.Core/Csmfd.Core.csproj" />
+    <Project Path="src/Csmfd.Protocol/Csmfd.Protocol.csproj" />
+    <Project Path="src/Csmfd.Server/Csmfd.Server.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Csmfd.Tests/Csmfd.Tests.csproj" />
+  </Folder>
+</Solution>

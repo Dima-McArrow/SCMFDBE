@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Windows host: WSS transport, SendInput, Game.log path, tray. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <AssemblyName>CSMFD.Server</AssemblyName>
+    <RootNamespace>Csmfd.Server</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Csmfd.Core\Csmfd.Core.csproj" />
+    <ProjectReference Include="..\Csmfd.Protocol\Csmfd.Protocol.csproj" />
+  </ItemGroup>
+
+</Project>

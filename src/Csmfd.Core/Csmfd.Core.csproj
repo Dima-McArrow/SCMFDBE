@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Platform-neutral logic: state reducer, input executor, log tailer, parser.
+       Talks to the OS only through interfaces, so tests run with fake clock/input sink. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Csmfd.Protocol\Csmfd.Protocol.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -2,8 +2,12 @@
 
 Minimal, secured Windows companion for the CSMFD iPad MFD (Star Citizen). It accepts a small allowlist of
 commands from **one paired iPad**, injects them into the focused game with `SendInput`, reads new
-`Game.log` lines and publishes a compact state. Contract: **protocol v2**, spec section 41 of
-`CSMFD-discussion.md`. Section 40 (v1) is historical and not implemented.
+`Game.log` lines and publishes a compact state.
+
+The iPad app (SwiftUI) is a separate repository, `SCMFD`, usually checked out next to this one. Contract:
+**protocol v2**, section 41 of `..\SCMFD\Claude outputs\CSMFD-discussion.md`. Section 40 (v1) is historical and
+not implemented. Agent and contributor rules: [`CLAUDE.md`](CLAUDE.md); design report (Russian):
+[`docs/SERVER-IMPLEMENTATION.md`](docs/SERVER-IMPLEMENTATION.md).
 
 What it deliberately does **not** do: no web UI, no REST, no cloud/accounts/analytics, no screen capture/OCR,
 no memory reading, no DLL injection or driver, no arbitrary macros or key names, no auto-update, no admin rights.
@@ -97,6 +101,27 @@ csmfd-probe --host <ip> --fp <hex> --token <token> --action lights  # one allowl
 csmfd-probe --host <ip> --fp <hex> --token <token> --stay 120       # idle client, ping every 5 s
 ```
 
+## Repository layout
+
+| Folder | Content |
+|---|---|
+| `src/Csmfd.Protocol` | Wire contract v2: strict parser, state writer, action allowlist, key names, limits. No dependencies |
+| `src/Csmfd.Core` | Platform-neutral logic: input executor, command gate, connection session, pairing, state store, Game.log pipeline, input monitor |
+| `src/Csmfd.Server` | Windows host: composition, Kestrel/WSS, config and storage, certificate and trust, Win32 input/focus/mDNS, tray |
+| `tests/Csmfd.Tests` | xUnit: protocol, core (fake clock and input), Win32-pure checks, loopback WSS end-to-end; JSON and Game.log fixtures |
+| `tools/Csmfd.Probe` | `csmfd-probe` dev client that plays the iPad |
+| `docs` | Design and implementation report |
+
+## Status
+
+| Part | State |
+|---|---|
+| Protocol v2, WSS/TLS with pinning, pairing, revoke | Implemented and tested; works with the iPad app over the LAN (2026-10-27) |
+| Commands from the iPad | Received, validated and shown in the Input monitor; in-game effect still to be verified |
+| Game.log: ship context, ClearDriver, QT target, ATC | Implemented; checked on real lines and a 117 MiB archive. The iPad does not consume this state yet |
+| Tray, network choice, pairing window, input monitor, icon | Working on the gaming PC |
+| In-game measurements (frametime, input latency, 2 h soak) | Not done |
+
 ## Known limits (honest list)
 
 - Ship control is **assumed** from the ship channel join; ClearDriver ends it. No confirmed seat state exists.
@@ -109,4 +134,3 @@ csmfd-probe --host <ip> --fp <hex> --token <token> --stay 120       # idle clien
 - If the anti-cheat denies reading the game's image path, focus falls back to the process name (logged).
 - Chat `KEYEVENTF_UNICODE` typing, chat key toggling, hold durations and F8 still need in-game calibration.
 - Self-destruct is protected only by the iPad slider; a paired client can send the allowed hold directly.
-- Performance budgets (41.15) are targets until measured on the gaming PC.

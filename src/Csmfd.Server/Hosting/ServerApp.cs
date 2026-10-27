@@ -58,7 +58,7 @@ internal sealed partial class ServerApp : IAsyncDisposable
             new Csmfd.Core.Diagnostics.ObservedInputSink(new Win32InputSink(), Monitor),
             GameWindow,
             new Win32PhysicalKeyboard(),
-            LoadEmotes(storage),
+            LoadEmotes(storage, _logger),
             Registry,
             new InputExecutorOptions { ChatKey = Config.ChatKey });
         Registry.Attach(Executor);
@@ -167,14 +167,21 @@ internal sealed partial class ServerApp : IAsyncDisposable
         LoggerFactory.Dispose();
     }
 
-    private static EmoteAllowlist LoadEmotes(ServerStorage storage)
+    private static EmoteAllowlist LoadEmotes(ServerStorage storage, ILogger logger)
     {
         if (!File.Exists(storage.EmotesPath))
         {
             storage.WriteAtomically(storage.EmotesPath, DefaultEmotes);
         }
 
-        return EmoteAllowlist.Parse(File.ReadAllText(storage.EmotesPath));
+        var emotes = EmoteAllowlist.Parse(File.ReadAllText(storage.EmotesPath));
+        if (emotes.Skipped.Count > 0)
+        {
+            // A skipped line means the iPad's emote is rejected as "invalid"; make that visible.
+            LogEmotesSkipped(logger, emotes.Skipped.Count, string.Join(", ", emotes.Skipped));
+        }
+
+        return emotes;
     }
 
     private async void OnNetworkChanged(object? sender, EventArgs e)
@@ -276,6 +283,9 @@ internal sealed partial class ServerApp : IAsyncDisposable
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Listener failed: {Reason}")]
     private static partial void LogListenerFailed(ILogger logger, string reason);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "emotes.txt: {Count} invalid entries skipped: {Names}")]
+    private static partial void LogEmotesSkipped(ILogger logger, int count, string names);
 
     private const string DefaultEmotes = """
         # Chat emotes the iPad may send, one base name per line ("/name" and "/name<N>" are accepted).

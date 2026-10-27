@@ -135,7 +135,7 @@ public sealed class StateStoreTests
 
 public sealed class EmoteAllowlistTests
 {
-    private readonly EmoteAllowlist _list = EmoteAllowlist.Parse("# emotes\nwave\ndance\n\ngasp\n");
+    private readonly EmoteAllowlist _list = EmoteAllowlist.Parse("# emotes\nwave\ndance\n\ngasp\nasl_thanks\n");
 
     [Theory]
     [InlineData("/wave", true)]
@@ -151,6 +151,10 @@ public sealed class EmoteAllowlistTests
     [InlineData("/3", false)]
     [InlineData("/salute", false)]
     [InlineData("/wave ", false)]
+    [InlineData("/asl_thanks", true)]
+    [InlineData("/asl_thanks2", true)]
+    [InlineData("/asl_", false)]
+    [InlineData("/asl", false)]
     public void ChecksBaseNameAndVariant(string text, bool allowed)
     {
         Assert.Equal(allowed, _list.IsAllowed(text));
@@ -159,7 +163,11 @@ public sealed class EmoteAllowlistTests
     [Fact]
     public void IgnoresCommentsAndInvalidNames()
     {
-        Assert.Equal(3, _list.Count);
-        Assert.Equal(1, new EmoteAllowlist(["/wave", "Bad", "two words", ""]).Count);
+        Assert.Equal(4, _list.Count);
+        Assert.Empty(_list.Skipped);
+
+        var list = new EmoteAllowlist(["/wave", "asl_hello", "Bad", "two words", "", "dance2", "_x"]);
+        Assert.Equal(2, list.Count);
+        Assert.Equal(["Bad", "two words", "dance2", "_x"], list.Skipped);
     }
 }

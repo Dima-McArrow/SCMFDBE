@@ -15,13 +15,18 @@ public sealed class EmoteAllowlist : IEmoteAllowlist
     public EmoteAllowlist(IEnumerable<string> baseNames)
     {
         ArgumentNullException.ThrowIfNull(baseNames);
-        _baseNames = baseNames
+        var names = baseNames
             .Select(name => name.Trim().TrimStart('/'))
-            .Where(name => name.Length > 0 && name.All(char.IsAsciiLetterLower))
-            .ToFrozenSet(StringComparer.Ordinal);
+            .Where(name => name.Length > 0)
+            .ToList();
+        _baseNames = names.Where(IsValidBaseName).ToFrozenSet(StringComparer.Ordinal);
+        Skipped = names.Where(name => !IsValidBaseName(name)).ToList();
     }
 
     public int Count => _baseNames.Count;
+
+    /// <summary>Non-empty entries that are not valid base names and were left out (shown in the server log).</summary>
+    public IReadOnlyList<string> Skipped { get; }
 
     /// <summary>One base name per line; empty lines and lines starting with # are ignored.</summary>
     public static EmoteAllowlist Parse(string text)
@@ -62,4 +67,13 @@ public sealed class EmoteAllowlist : IEmoteAllowlist
         var lookup = _baseNames.GetAlternateLookup<ReadOnlySpan<char>>();
         return lookup.Contains(body[..^digits]);
     }
+
+    /// <summary>
+    /// Same shape as the stems in Emote.swift: a lowercase ASCII letter, then lowercase letters or '_'
+    /// ("wave", "asl_thanks"). Digits are excluded because trailing digits are the variant number.
+    /// </summary>
+    private static bool IsValidBaseName(string name) =>
+        name.Length > 0
+        && char.IsAsciiLetterLower(name[0])
+        && name.All(c => char.IsAsciiLetterLower(c) || c == '_');
 }

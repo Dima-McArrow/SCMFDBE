@@ -49,13 +49,15 @@ internal sealed partial class ServerApp : IAsyncDisposable
         Config = storage.LoadConfig();
         _activeGameExePath = Config.GameExePath;
         _activeGameLogPath = Config.GameLogPath;
+        var fileLogs = new FileLoggerProvider(storage.LogDirectory);
         LoggerFactory = Microsoft.Extensions.Logging.LoggerFactory.Create(builder =>
-            builder.SetMinimumLevel(LogLevel.Information)
+            builder.SetMinimumLevel(LogLevel.Debug) // the file provider decides (Information unless debug is on)
                 .AddFilter("Microsoft", LogLevel.Warning) // hosting chatter includes full local paths (spec 41.16)
-                .AddProvider(new FileLoggerProvider(storage.LogDirectory)));
+                .AddProvider(fileLogs));
         _logger = LoggerFactory.CreateLogger<ServerApp>();
 
         var time = TimeProvider.System;
+        DebugLogging = new DebugLogging(fileLogs, time, LoggerFactory.CreateLogger<DebugLogging>());
         Store = new StateStore();
         Monitor = new Csmfd.Core.Diagnostics.InputMonitor(time);
         Registry = new ControllerRegistry { Monitor = Monitor };
@@ -74,7 +76,7 @@ internal sealed partial class ServerApp : IAsyncDisposable
         Pairing.DeviceRevoked += Registry.OnDeviceRevoked;
 
         Tailer = new LogTailer(Config.GameLogPath);
-        Processor = new GameLogProcessor(Store, Executor, time, Tailer.Generation, Tailer.ProbeLength);
+        Processor = new GameLogProcessor(Store, Executor, time, Tailer.Generation, Tailer.ProbeLength, LoggerFactory.CreateLogger<GameLogProcessor>());
         Registry.InputStartedNotified += Processor.OnInputStarted;
 
         GameMonitor = new GameMonitor(GameWindow, Store, Executor, time, GameMonitor.ReadBuild(Config.GameExePath));
@@ -95,6 +97,9 @@ internal sealed partial class ServerApp : IAsyncDisposable
     public ServerConfig Config { get; private set; }
 
     public ILoggerFactory LoggerFactory { get; }
+
+    /// <summary>Tray switch for 15 minutes of debug detail in the log file.</summary>
+    public DebugLogging DebugLogging { get; }
 
     public StateStore Store { get; }
 
@@ -189,6 +194,7 @@ internal sealed partial class ServerApp : IAsyncDisposable
         Executor.Dispose();
         Certificate.Dispose();
         _listenerSwitch.Dispose();
+        DebugLogging.Dispose();
         LogStopped(_logger);
         LoggerFactory.Dispose();
     }

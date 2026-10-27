@@ -49,7 +49,13 @@ Discovery is a convenience; the fingerprint is never taken from mDNS and manual 
 
 Status · Pair iPad · Network · Game (choose `StarCitizen.exe` of LIVE, PTU…; `Game.log` is derived from it; applies
 after a restart) · Trusted devices (revoke one / all) · Pause input (releases immediately) ·
-Re-enable input (only after a failed release) · Input monitor · Copy firewall command · Open data folder · Quit.
+Re-enable input (only after a failed release) · Input monitor · Debug logging (15 min, then off by itself) ·
+Copy firewall command · Open data folder · Quit.
+
+**Debug logging**: for 15 minutes the log file also explains Game.log decisions (recognized event and offset, ship
+context revisions, ship ↔ entity binding, ignored ClearDriver / QT / hangar notifications and why, ATC pending /
+answered / timeout) and every state sent to the iPad (seq, full or delta). Same privacy rules as the normal log: no
+player handle, raw log lines, chat text, tokens or codes. Always off after a restart.
 
 **Input monitor** (debug window): every command received from the iPad, its result (sent / rejected with reason /
 ignored, server-side releases) and the exact events handed to SendInput (e.g. `Alt↓ N↓ … N↑ Alt↑`). It records only while
@@ -63,7 +69,7 @@ the window is open, keeps at most 2000 pending entries in memory, never writes t
 | `server-certificate.bin` | ECDSA P-256 certificate + key, PKCS#12 protected with DPAPI (CurrentUser). Created once; deleting it requires re-pairing |
 | `trusted-devices.json` | Device id, name, pairing time and **SHA-256 of the token** (never the token) |
 | `emotes.txt` | Chat allowlist, one base name per line (`/name` and `/name<N>` accepted). **Sync with `Emote.swift`** |
-| `logs\csmfd*.log` | Lifecycle and warnings only, 3 × 1 MiB. No tokens, codes, keys or Game.log content |
+| `logs\csmfd*.log` | Lifecycle and warnings (plus decisions while Debug logging is on), 3 × 1 MiB. No tokens, codes, keys or Game.log content |
 
 ## How it maps to the spec
 

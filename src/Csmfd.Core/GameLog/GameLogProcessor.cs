@@ -1,6 +1,8 @@
 using Csmfd.Core.Input;
 using Csmfd.Core.State;
 using Csmfd.Protocol;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Csmfd.Core.GameLog;
 
@@ -9,8 +11,10 @@ namespace Csmfd.Core.GameLog;
 /// ship context lifecycle, QT target of the current ship and the ATC request indicator.
 /// Lock order: this class never calls the executor while holding its own lock, because the
 /// executor calls <see cref="OnInputStarted"/> while holding its lock.
+/// Debug messages explain each decision (event type, offset, revision, entity ids, ignore reasons) but
+/// never contain the player handle (channel owner) or raw log lines.
 /// </summary>
-public sealed class GameLogProcessor : IDisposable
+public sealed partial class GameLogProcessor : IDisposable
 {
     public static readonly TimeSpan HangarTimeout = TimeSpan.FromSeconds(120);
 
@@ -22,6 +26,7 @@ public sealed class GameLogProcessor : IDisposable
     private readonly InputExecutor _executor;
     private readonly TimeProvider _time;
     private readonly Func<long> _probeWatermark;
+    private readonly ILogger _logger;
     private readonly Dictionary<string, VehicleSpawning> _spawns = new(StringComparer.Ordinal);
     private readonly Queue<string> _spawnOrder = new();
     private readonly Dictionary<string, VehicleObserved> _observations = new(StringComparer.Ordinal);
@@ -41,12 +46,13 @@ public sealed class GameLogProcessor : IDisposable
     private HangarRequestState _hangarState = HangarRequestState.Idle;
     private long _hangarToken;
 
-    public GameLogProcessor(StateStore store, InputExecutor executor, TimeProvider time, Guid initialGeneration, Func<long> probeWatermark)
+    public GameLogProcessor(StateStore store, InputExecutor executor, TimeProvider time, Guid initialGeneration, Func<long> probeWatermark, ILogger? logger = null)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _executor = executor ?? throw new ArgumentNullException(nameof(executor));
         _time = time ?? throw new ArgumentNullException(nameof(time));
         _probeWatermark = probeWatermark ?? throw new ArgumentNullException(nameof(probeWatermark));
+        _logger = logger ?? NullLogger.Instance;
         _generation = initialGeneration;
     }
 
@@ -57,6 +63,8 @@ public sealed class GameLogProcessor : IDisposable
         {
             return;
         }
+
+        LogRecognized(_logger, parsed.GetType().Name, line.Offset);
 
         var cancelInput = false;
         lock (_gate)
@@ -88,6 +96,7 @@ public sealed class GameLogProcessor : IDisposable
             _active = null;
             _ended = null;
             _contextId = null;
+            LogGenerationReset(_logger, generation);
             Transition(ShipContextStatus.Unknown, ShipContextReason.LogReset, _time.GetUtcNow());
         }
 
@@ -146,6 +155,7 @@ public sealed class GameLogProcessor : IDisposable
             var now = _time.GetUtcNow();
             _hangar = new PendingHangar(token, commandId, _contextId, _generation, watermark, timer);
             _hangarState = new HangarRequestState(HangarRequestStatus.Pending, commandId, _contextId, now, now);
+            LogAtcPending(_logger, commandId, watermark);
             Publish(urgent: false);
         }
     }
@@ -188,7 +198,12 @@ public sealed class GameLogProcessor : IDisposable
                 if (_active?.EntityId is { } entityId && string.Equals(entityId, target.EntityId, StringComparison.Ordinal))
                 {
                     _qt = new QtTargetState(QtMode.Destination, target.Target, DisplayName: null, Confidence.Confirmed, target.At);
+                    LogQtAccepted(_logger, target.Target, target.EntityId);
                     Publish(urgent: false);
+                }
+                else
+                {
+                    LogQtIgnored(_logger, target.EntityId, _active?.EntityId ?? "unknown");
                 }
 
                 return false;
@@ -217,6 +232,7 @@ public sealed class GameLogProcessor : IDisposable
                 : GameLogParser.ShipNameMatchesModel(active.Name, clear.Model);
             if (!matches)
             {
+                LogClearDriverIgnored(_logger, clear.EntityId, "another vehicle");
                 return false; // Another vehicle: our Deck stays on (spec 41.18).
             }
 
@@ -234,22 +250,32 @@ public sealed class GameLogProcessor : IDisposable
             return true;
         }
 
+        LogClearDriverIgnored(_logger, clear.EntityId, "no matching ship context");
         return false;
     }
 
     private void ApplyHangarCompleted(HangarRequestCompleted completed, LogLine line)
     {
-        if (_hangar is not { } pending
-            || pending.Generation != line.Generation
-            || line.Offset < pending.Watermark
-            || pending.ContextId != _contextId)
+        if (_hangar is not { } pending)
         {
+            LogAtcIgnored(_logger, line.Offset, "no pending request from the iPad");
+            return;
+        }
+
+        var ignored = pending.Generation != line.Generation ? "other log generation"
+            : line.Offset < pending.Watermark ? "written before the request (watermark)"
+            : pending.ContextId != _contextId ? "other ship context"
+            : null;
+        if (ignored is not null)
+        {
+            LogAtcIgnored(_logger, line.Offset, ignored);
             return;
         }
 
         pending.Timer.Dispose();
         _hangar = null;
         _hangarState = _hangarState with { Status = HangarRequestStatus.Answered, UpdatedAt = completed.At };
+        LogAtcAnswered(_logger, pending.CommandId, line.Offset);
         Publish(urgent: false);
     }
 
@@ -265,6 +291,7 @@ public sealed class GameLogProcessor : IDisposable
             pending.Timer.Dispose();
             _hangar = null;
             _hangarState = _hangarState with { Status = HangarRequestStatus.Timeout, UpdatedAt = _time.GetUtcNow() };
+            LogAtcTimeout(_logger, pending.CommandId);
             Publish(urgent: false);
         }
     }
@@ -293,6 +320,7 @@ public sealed class GameLogProcessor : IDisposable
         _hangar?.Timer.Dispose();
         _hangar = null;
         _hangarState = HangarRequestState.Idle;
+        LogTransition(_logger, _revision, status, reason, _active?.Name ?? "none", _lastPrefix ?? "none");
         Publish(urgent: true);
     }
 
@@ -332,6 +360,7 @@ public sealed class GameLogProcessor : IDisposable
 
             if (candidate is not null && candidate.EntityId != observed.EntityId)
             {
+                LogBindAmbiguous(_logger, candidate.EntityId, observed.EntityId);
                 return false; // Ambiguous: keep the id unknown.
             }
 
@@ -344,6 +373,7 @@ public sealed class GameLogProcessor : IDisposable
         }
 
         _active = active with { Model = candidate.Model, EntityId = candidate.EntityId };
+        LogBound(_logger, candidate.Model, candidate.EntityId);
         return true;
     }
 
@@ -374,6 +404,42 @@ public sealed class GameLogProcessor : IDisposable
 
         map[key] = value;
     }
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Game.log: {Event} at offset {Offset}")]
+    private static partial void LogRecognized(ILogger logger, string @event, long offset);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Game.log reset: new generation {Generation}")]
+    private static partial void LogGenerationReset(ILogger logger, Guid generation);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Ship context revision {Revision}: {Status} / {Reason}, ship {Ship}, prefix {Prefix}")]
+    private static partial void LogTransition(ILogger logger, long revision, ShipContextStatus status, ShipContextReason reason, string ship, string prefix);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Ship bound to model {Model}, entity {EntityId}")]
+    private static partial void LogBound(ILogger logger, string model, string entityId);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Ship binding ambiguous (entities {First} and {Second}): entity stays unknown")]
+    private static partial void LogBindAmbiguous(ILogger logger, string first, string second);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "ClearDriver for entity {EntityId} ignored: {Reason}")]
+    private static partial void LogClearDriverIgnored(ILogger logger, string entityId, string reason);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "QT destination {Target} accepted for entity {EntityId}")]
+    private static partial void LogQtAccepted(ILogger logger, string target, string entityId);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "QT target of entity {EntityId} ignored (our ship entity: {Bound})")]
+    private static partial void LogQtIgnored(ILogger logger, string entityId, string bound);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "ATC pending for command {CommandId}, watermark {Watermark}")]
+    private static partial void LogAtcPending(ILogger logger, Guid commandId, long watermark);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "ATC answered for command {CommandId} by offset {Offset}")]
+    private static partial void LogAtcAnswered(ILogger logger, Guid commandId, long offset);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Hangar notification at offset {Offset} ignored: {Reason}")]
+    private static partial void LogAtcIgnored(ILogger logger, long offset, string reason);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "ATC timeout for command {CommandId}")]
+    private static partial void LogAtcTimeout(ILogger logger, Guid commandId);
 
     private sealed record ActiveShip(string Name, string Owner, string Prefix, DateTimeOffset JoinedAt)
     {

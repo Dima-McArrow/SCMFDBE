@@ -25,6 +25,7 @@ public sealed class GameLogProcessorTests : IDisposable
     private readonly InputExecutor _executor;
     private readonly GameLogProcessor _processor;
     private readonly Guid _generation = Guid.NewGuid();
+    private readonly RecordingLogger _log = new();
     private long _watermark;
     private long _offset;
 
@@ -32,7 +33,7 @@ public sealed class GameLogProcessorTests : IDisposable
     {
         _sink = new FakeInputSink(_time);
         _executor = new InputExecutor(_time, _sink, new FakeGameWindow(), new FakeKeyboard(), new EmoteAllowlist([]), new RecordingOutput());
-        _processor = new GameLogProcessor(_store, _executor, _time, _generation, () => _watermark);
+        _processor = new GameLogProcessor(_store, _executor, _time, _generation, () => _watermark, _log);
     }
 
     private StateSnapshot State => _store.Current;
@@ -229,6 +230,27 @@ public sealed class GameLogProcessorTests : IDisposable
         Assert.Null(State.Ship);
         Assert.Equal(ShipContextReason.GameEnded, State.ShipContext.Reason);
         Assert.Equal(3, State.ShipContext.Revision); // join, ClearDriver, game ended
+    }
+
+    [Fact]
+    public void DebugLogExplainsDecisionsWithoutThePlayerHandle()
+    {
+        Feed(Spawn, Join, NoRoute, Target, OtherTarget, OtherClear, Hangar, Clear, Quit);
+
+        var messages = _log.Entries.Select(e => e.Message).ToList();
+        Assert.All(_log.Entries, e => Assert.Equal(Microsoft.Extensions.Logging.LogLevel.Debug, e.Level));
+
+        // The channel owner is the player's handle: personal data, never logged (spec 41.16).
+        Assert.DoesNotContain(messages, m => m.Contains("Test_Pilot", StringComparison.Ordinal));
+
+        Assert.Contains("Ship context revision 1: Assumed / ChannelJoined, ship Drake Cutter Rambler, prefix DRAK", messages);
+        Assert.Contains(messages, m => m.StartsWith("Ship bound to model", StringComparison.Ordinal) && m.EndsWith("entity 903627021939", StringComparison.Ordinal));
+        Assert.Contains("QT destination Stanton4a accepted for entity 903627021939", messages);
+        Assert.Contains("QT target of entity 902412078691 ignored (our ship entity: 903627021939)", messages);
+        Assert.Contains("ClearDriver for entity 901556573221 ignored: another vehicle", messages);
+        Assert.Contains(messages, m => m.StartsWith("Hangar notification at offset", StringComparison.Ordinal) && m.EndsWith("no pending request from the iPad", StringComparison.Ordinal));
+        Assert.Contains(messages, m => m.StartsWith("Ship context revision 2: NoShip / ClearDriver", StringComparison.Ordinal));
+        Assert.Contains(messages, m => m.StartsWith("Ship context revision 3: NoShip / GameEnded", StringComparison.Ordinal));
     }
 
     private void Feed(params string[] lines)

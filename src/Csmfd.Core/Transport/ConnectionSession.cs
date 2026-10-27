@@ -439,10 +439,12 @@ public sealed partial class ConnectionSession : IControllerConnection, IDisposab
                     Interlocked.Exchange(ref _stateReady, 0);
                     var (snapshot, seq) = _store.TakeFull();
                     await SendAsync(ServerMessageWriter.FullState(_store.SessionId, seq, snapshot), cancellationToken).ConfigureAwait(false);
+                    LogStateSent(_logger, Id, seq, partial: false);
                 }
                 else if (Interlocked.Exchange(ref _stateReady, 0) == 1 && _store.TakeDelta() is { } delta)
                 {
                     await SendAsync(ServerMessageWriter.DeltaState(_store.SessionId, delta.Seq, delta.Delta), cancellationToken).ConfigureAwait(false);
+                    LogStateSent(_logger, Id, delta.Seq, partial: true);
                 }
             }
         }
@@ -657,6 +659,9 @@ public sealed partial class ConnectionSession : IControllerConnection, IDisposab
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Connection {ConnectionId} dropped as slow client")]
     private static partial void LogSlowClient(ILogger logger, Guid connectionId);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Connection {ConnectionId} sent state seq {Seq} (partial: {Partial})")]
+    private static partial void LogStateSent(ILogger logger, Guid connectionId, long seq, bool partial);
 
     private sealed record CloseRequest(int Code, string Description);
 }

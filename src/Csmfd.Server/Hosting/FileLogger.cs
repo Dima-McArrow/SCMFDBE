@@ -6,6 +6,8 @@ namespace Csmfd.Server.Hosting;
 /// <summary>
 /// Bounded local diagnostics (spec 41.16): at most 3 files of 1 MiB, warnings/lifecycle only.
 /// Callers never log tokens, pairing codes, keys, Game.log content or full paths.
+/// The minimum level can change at runtime (temporary debug logging); the logger factory must let
+/// Debug through so this provider is the one that decides.
 /// </summary>
 internal sealed class FileLoggerProvider(string directory, LogLevel minimumLevel = LogLevel.Information) : ILoggerProvider
 {
@@ -14,6 +16,14 @@ internal sealed class FileLoggerProvider(string directory, LogLevel minimumLevel
 
     private readonly Lock _gate = new();
     private StreamWriter? _writer;
+    private volatile int _minimumLevel = (int)minimumLevel;
+
+    /// <summary>Read on every IsEnabled call, so a change applies to existing loggers at once.</summary>
+    public LogLevel MinimumLevel
+    {
+        get => (LogLevel)_minimumLevel;
+        set => _minimumLevel = (int)value;
+    }
 
     public ILogger CreateLogger(string categoryName) => new FileLogger(this, ShortCategory(categoryName));
 
@@ -97,6 +107,4 @@ internal sealed class FileLoggerProvider(string directory, LogLevel minimumLevel
             }
         }
     }
-
-    private LogLevel MinimumLevel { get; } = minimumLevel;
 }

@@ -42,6 +42,25 @@ internal sealed class FakeInputSink(TimeProvider time) : IInputSink
         ((long)time.GetElapsedTime(_start).TotalMilliseconds).ToString(CultureInfo.InvariantCulture);
 }
 
+/// <summary>Keeps every formatted message with its level; all levels are enabled.</summary>
+internal sealed class RecordingLogger : Microsoft.Extensions.Logging.ILogger
+{
+    public List<(Microsoft.Extensions.Logging.LogLevel Level, string Message)> Entries { get; } = [];
+
+    public IDisposable? BeginScope<TState>(TState state)
+        where TState : notnull => null;
+
+    public bool IsEnabled(Microsoft.Extensions.Logging.LogLevel logLevel) => true;
+
+    public void Log<TState>(
+        Microsoft.Extensions.Logging.LogLevel logLevel,
+        Microsoft.Extensions.Logging.EventId eventId,
+        TState state,
+        Exception? exception,
+        Func<TState, Exception?, string> formatter) =>
+        Entries.Add((logLevel, formatter(state, exception)));
+}
+
 internal sealed class FakeGameWindow : IGameWindow
 {
     public GameFocus Focus { get; set; } = GameFocus.Focused;

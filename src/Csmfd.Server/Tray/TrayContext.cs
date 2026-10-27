@@ -135,6 +135,11 @@ internal sealed partial class TrayContext : ApplicationContext
 
         _menu.Items.Add(new ToolStripSeparator());
         _menu.Items.Add(new ToolStripMenuItem("Input monitor…", null, (_, _) => OpenInputMonitor()));
+        var debugUntil = _app.DebugLogging.Until;
+        var debugText = debugUntil is { } until
+            ? "Debug logging until " + until.ToLocalTime().ToString("HH:mm", CultureInfo.CurrentCulture)
+            : "Debug logging (15 min)";
+        _menu.Items.Add(new ToolStripMenuItem(debugText, null, (_, _) => ToggleDebugLogging()) { Checked = debugUntil is not null });
         _menu.Items.Add(new ToolStripMenuItem("Copy firewall command", null, (_, _) => CopyFirewallCommand()));
         _menu.Items.Add(new ToolStripMenuItem("Open data folder", null, (_, _) => OpenFolder(_app.Storage.Directory)));
         _menu.Items.Add(new ToolStripSeparator());
@@ -286,6 +291,23 @@ internal sealed partial class TrayContext : ApplicationContext
             _inputMonitor = null;
         };
         _inputMonitor.Show();
+    }
+
+    /// <summary>15 minutes of Game.log decisions and state sends in the log file, then off by itself.</summary>
+    private void ToggleDebugLogging()
+    {
+        if (_app.DebugLogging.Until is not null)
+        {
+            _app.DebugLogging.Disable();
+            return;
+        }
+
+        _app.DebugLogging.Enable();
+        _icon.ShowBalloonTip(
+            6000,
+            "CSMFD Server",
+            "Debug logging on for 15 minutes. Logs: tray → Open data folder → logs.",
+            ToolTipIcon.Info);
     }
 
     private void TogglePause()

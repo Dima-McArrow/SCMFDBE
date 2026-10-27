@@ -67,6 +67,13 @@ Protocol and input decisions never live in the tray or in `WssHost`.
 - Time comes from an injected `TimeProvider`. No `DateTime.Now/UtcNow`, `Stopwatch`, `Task.Delay`, `Thread.Sleep` in
   `Core` or `Protocol`; tests drive timers with `FakeTimeProvider`.
 - Logging through source-generated `[LoggerMessage]` partial methods, as in the existing classes.
+- Levels: Information for lifecycle, Warning for problems, Debug for decisions (why a Game.log line changed or did
+  not change state, state sends). The file shows Debug only while the tray switch is on (`DebugLogging`, 15 min,
+  then off by itself; off at every start). The factory lets Debug through and `FileLoggerProvider.MinimumLevel`
+  decides, so a Debug call costs one comparison when the switch is off.
+- Debug messages obey the same privacy rules as the rest: event types, offsets, revisions, entity ids, command ids
+  and reasons are fine; the player handle (channel owner), raw Game.log lines, chat text, tokens, codes and full
+  paths are not. `DebugLogExplainsDecisionsWithoutThePlayerHandle` pins the player-handle rule.
 - P/Invoke: `LibraryImport` in `Win32/NativeMethods.cs`, blittable structs (`INPUT` size is tested).
 - Files: `ServerStorage.WriteAtomically` (temp + move); JSON is camelCase, read case-insensitively.
 - Wire timestamps: ISO 8601 UTC **with milliseconds**. UUIDs lowercase on the wire.

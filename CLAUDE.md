@@ -43,6 +43,7 @@ dotnet publish src/Csmfd.Server -c Release -o publish   # publish/ is git-ignore
 - Tests use **xUnit** (`[Fact]`, `[Theory]`; `Xunit` is a global using). Tests never call real `SendInput`.
 - Code comments and all strings in English (tray text is not localized).
 - Keep changes to what was asked; mention other problems instead of fixing them silently.
+- Commit directly on `main`; no feature branches.
 
 ## Projects and dependency direction
 

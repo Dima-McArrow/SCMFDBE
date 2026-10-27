@@ -2,11 +2,20 @@
 
   <!-- Windows host: WSS transport, SendInput, Game.log path, tray. -->
   <PropertyGroup>
-    <OutputType>Exe</OutputType>
+    <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>
     <AssemblyName>CSMFD.Server</AssemblyName>
     <RootNamespace>Csmfd.Server</RootNamespace>
+    <UseWindowsForms>true</UseWindowsForms>
+    <!-- Source-generated P/Invoke (LibraryImport) for SendInput & co. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <Version>0.1.0</Version>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
   </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Csmfd.Core\Csmfd.Core.csproj" />
@@ -14,7 +23,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="System.Security.Cryptography.ProtectedData" />
+    <InternalsVisibleTo Include="Csmfd.Tests" />
   </ItemGroup>
 
 </Project>

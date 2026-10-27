@@ -46,6 +46,11 @@
         "resolved": "17.14.1",
         "contentHash": "pmTrhfFIoplzFVbhVwUquT+77CbGH+h4/3mBpdmIlYtBi9nAB+kKI6dN3A/nV4DFi3wLLx/BlHIPK+MkbQ6Tpg=="
       },
+      "Microsoft.Extensions.DependencyInjection.Abstractions": {
+        "type": "Transitive",
+        "resolved": "10.0.14",
+        "contentHash": "QtpQzuSZVyTPCuHW058yCs9Nj0394uUkNyFHS813nOmK9UgUdBdaprJ5PPsBgsQIpxADTsTkbaMMonykem6qdw=="
+      },
       "Microsoft.TestPlatform.ObjectModel": {
         "type": "Transitive",
         "resolved": "17.14.1",
@@ -108,7 +113,8 @@
       "csmfd.core": {
         "type": "Project",
         "dependencies": {
-          "Csmfd.Protocol": "[1.0.0, )"
+          "Csmfd.Protocol": "[1.0.0, )",
+          "Microsoft.Extensions.Logging.Abstractions": "[10.0.14, )"
         }
       },
       "csmfd.protocol": {
@@ -118,15 +124,17 @@
         "type": "Project",
         "dependencies": {
           "Csmfd.Core": "[1.0.0, )",
-          "Csmfd.Protocol": "[1.0.0, )",
-          "System.Security.Cryptography.ProtectedData": "[10.0.14, )"
+          "Csmfd.Protocol": "[1.0.0, )"
         }
       },
-      "System.Security.Cryptography.ProtectedData": {
+      "Microsoft.Extensions.Logging.Abstractions": {
         "type": "CentralTransitive",
         "requested": "[10.0.14, )",
         "resolved": "10.0.14",
-        "contentHash": "UuaBUHgmtc9h6CMxaQqFDDJxkS5JVy7XEB+DbtCvD68GFcVM9/AccuNwFpARx8nwCnvjaxzoOBjG3gPz32P1Eg=="
+        "contentHash": "SwcbEBtkECq3D2oywvHkm46fyrX9Dd2JPWphDnHUc2+cUWR1Mdo41atAjh/9iZjgQxuvbKfZKXqostT/LZfefA==",
+        "dependencies": {
+          "Microsoft.Extensions.DependencyInjection.Abstractions": "10.0.14"
+        }
       }
     }
   }

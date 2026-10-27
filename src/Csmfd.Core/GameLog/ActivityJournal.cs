@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 using Csmfd.Protocol;
@@ -168,8 +169,27 @@ public sealed partial class ActivityJournal
         var kind = string.Empty;
         long? amount = null;
         string? currency = null;
+        string? channelId = null;
+        var channel = ChannelRegex().Match(body);
         var reward = RewardRegex().Match(body);
-        if (reward.Success && long.TryParse(reward.Groups["amount"].Value.Replace(",", string.Empty, StringComparison.Ordinal), NumberStyles.None, CultureInfo.InvariantCulture, out var value)
+        if (channel.Success)
+        {
+            var name = channel.Groups["name"].Value.Trim();
+            var owner = channel.Groups["owner"].Value.Trim();
+            if (!TextRules.IsValidText(name, 1, ActivityLimits.TextScalars)
+                || !TextRules.IsValidText(owner, 1, ProtocolLimits.MaxNameScalars))
+            {
+                return false;
+            }
+
+            // Opaque identity only: association and theme policy belong to the iPad.
+            // Scope the hash to this capture; never send the owner handle.
+            channelId = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(
+                _streamId.ToString("D") + "\n" + name + "\n" + owner)));
+            kind = channel.Groups["verb"].Value == "joined" ? "shipChannelJoined" : "shipChannelLeft";
+            body = name;
+        }
+        else if (reward.Success && long.TryParse(reward.Groups["amount"].Value.Replace(",", string.Empty, StringComparison.Ordinal), NumberStyles.None, CultureInfo.InvariantCulture, out var value)
             && value is > 0 and <= 1_000_000_000)
         {
             kind = "reward";
@@ -196,12 +216,13 @@ public sealed partial class ActivityJournal
 
         var mission = MissionRegex().Match(notification);
         Guid? missionId = mission.Success && Guid.TryParse(mission.Groups[1].Value, out var id) && id != Guid.Empty ? id : null;
-        if (kind != "reward" && missionId is null)
+        if (channelId is null && kind != "reward" && missionId is null)
         {
             return false;
         }
 
-        var identity = _notificationAt.ToString("O", CultureInfo.InvariantCulture) + notification[end..];
+        var identity = _notificationAt.ToString("O", CultureInfo.InvariantCulture) + notification[end..]
+            + (channelId is null ? string.Empty : kind + channelId);
         if (!_seen.Add(identity))
         {
             return false;
@@ -216,14 +237,14 @@ public sealed partial class ActivityJournal
         var objective = ObjectiveRegex().Match(notification);
         var objectiveId = objective.Success && TextRules.IsValidText(objective.Groups[1].Value, 1, ActivityLimits.ObjectiveScalars)
             ? objective.Groups[1].Value : null;
-        Add(kind, _notificationAt, Clean(body, ActivityLimits.TextScalars), missionId,
-            objectiveId, amount, currency);
+        Add(kind, _notificationAt, Clean(body, ActivityLimits.TextScalars), channelId is null ? missionId : null,
+            channelId is null ? objectiveId : null, amount, currency, channelId);
         return true;
     }
 
-    private void Add(string kind, DateTimeOffset at, string text, Guid? missionId, string? objectiveId, long? amount, string? currency)
+    private void Add(string kind, DateTimeOffset at, string text, Guid? missionId, string? objectiveId, long? amount, string? currency, string? channelId = null)
     {
-        _events.Enqueue(new ActivityEvent(++_seq, kind, at, text, missionId, objectiveId, amount, currency));
+        _events.Enqueue(new ActivityEvent(++_seq, kind, at, text, missionId, objectiveId, amount, currency, channelId));
         if (_events.Count > ActivityLimits.History)
         {
             _events.Dequeue();
@@ -253,6 +274,9 @@ public sealed partial class ActivityJournal
         ("Contract Withdrawn:", "contractWithdrawn"), ("Contract Failed:", "contractFailed"),
         ("New Objective:", "newObjective"), ("Objective Complete:", "objectiveComplete"),
     ];
+
+    [GeneratedRegex("""^You have (?<verb>joined|left the) channel '(?<name>[^:]+) : (?<owner>[^']+)'\.?$""", RegexOptions.CultureInvariant, 50)]
+    private static partial Regex ChannelRegex();
 
     [GeneratedRegex(@"^Awarded (?<amount>[0-9][0-9,]*) (?<currency>aUEC|UEC):?\s*$", RegexOptions.CultureInvariant, 50)]
     private static partial Regex RewardRegex();

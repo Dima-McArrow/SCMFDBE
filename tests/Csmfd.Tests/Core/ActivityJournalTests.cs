@@ -13,6 +13,65 @@ public sealed class ActivityJournalTests
     internal static string Notification(string body, int notificationId = 1, string mission = "00000000-0000-0000-0000-000000000000", string objective = "") =>
         $"<2026-10-27T12:00:00.000Z> [Notice] <SHUDEvent_OnNotification> Added notification \"{body}\" [{notificationId}] to queue. New queue size: 1, MissionId: [{mission}], ObjectiveId: [{objective}]";
 
+    [Theory]
+    [InlineData("Drake Cutter Rambler")]
+    [InlineData("Drake Vulture Teach's Special")]
+    [InlineData("Crusader C1 Spirit")]
+    public void ChannelObservationsShareOpaqueIdentityWithoutPublishingOwner(string ship)
+    {
+        _journal.OnLine(new LogLine(Notification($"You have joined channel '{ship} : Test_Pilot'", 1), 10, Generation));
+        _journal.OnLine(new LogLine(Notification($"You have left the channel '{ship} : Test_Pilot'.", 2), 20, Generation));
+        var events = _journal.Read(null, 0)!.Events;
+        Assert.Equal(2, events.Count);
+        Assert.Equal("shipChannelJoined", events[0].Kind);
+        Assert.Equal("shipChannelLeft", events[1].Kind);
+        Assert.Equal(events[0].ChannelId, events[1].ChannelId);
+        Assert.Equal(64, events[0].ChannelId!.Length);
+        Assert.All(events, item =>
+        {
+            Assert.Equal(ship, item.Text);
+            Assert.Null(item.MissionId);
+            Assert.Null(item.Amount);
+        });
+    }
+
+    [Fact]
+    public void ChannelIdentitySeparatesOwnersAndJournalDoesNotMatchDepartures()
+    {
+        _journal.OnLine(new LogLine(Notification("You have joined channel 'Drake Cutter : Alice'", 1), 10, Generation));
+        _journal.OnLine(new LogLine(Notification("You have left the channel 'Drake Cutter : Bob'.", 2), 20, Generation));
+        var events = _journal.Read(null, 0)!.Events;
+        Assert.Equal(2, events.Count);
+        Assert.NotEqual(events[0].ChannelId, events[1].ChannelId);
+    }
+
+    [Fact]
+    public void ChannelIdentitySurvivesClearDriverButChangesWithCapture()
+    {
+        var join = Notification("You have joined channel 'Drake Cutter : Test_Pilot'", 1);
+        _journal.OnLine(new LogLine(join, 10, Generation));
+        var identity = Assert.Single(_journal.Read(null, 0)!.Events).ChannelId;
+        _journal.OnLine(new LogLine("<2026-10-27T12:00:01.000Z> [Notice] <Vehicle Control Flow> ClearDriver", 20, Generation));
+        _journal.OnLine(new LogLine(Notification("You have left the channel 'Drake Cutter : Test_Pilot'.", 2), 30, Generation));
+        Assert.Equal(identity, _journal.Read(null, 0)!.Events[1].ChannelId);
+        var next = Guid.NewGuid();
+        _journal.Reset(next);
+        _journal.OnLine(new LogLine(join, 10, Generation));
+        Assert.Empty(_journal.Read(null, 0)!.Events);
+        _journal.OnLine(new LogLine(join, 10, next));
+        Assert.NotEqual(identity, Assert.Single(_journal.Read(null, 0)!.Events).ChannelId);
+    }
+
+    [Fact]
+    public void ChannelDisplayReprintsAndDuplicateNotificationsAreNotReplayedTwice()
+    {
+        var text = Notification("You have left the channel 'Drake Cutter : Test_Pilot'.");
+        _journal.OnLine(new LogLine(text, 10, Generation));
+        _journal.OnLine(new LogLine(text, 20, Generation));
+        _journal.OnLine(new LogLine(text.Replace("Added notification", "UpdateNotificationItem", StringComparison.Ordinal), 30, Generation));
+        Assert.Single(_journal.Read(null, 0)!.Events);
+    }
+
     [Fact]
     public void RewardsHaveAnExplicitAmountAndNoInventedMission()
     {

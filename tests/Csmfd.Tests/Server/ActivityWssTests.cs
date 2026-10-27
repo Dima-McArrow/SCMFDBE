@@ -6,6 +6,32 @@ namespace Csmfd.Tests.Server;
 public sealed class ActivityWssTests
 {
     [Fact]
+    public async Task ChannelObservationsUseAuthenticatedReplayWithoutSendingOwnerHandles()
+    {
+        await using var server = await WssTestServer.StartAsync(activity: true);
+        var generation = server.Services.Store.Current.Log.Generation;
+        server.Services.Activity!.OnLine(new LogLine(ActivityJournalTests.Notification("You have joined channel 'Drake Cutter : Private_Owner'", 1), 10, generation));
+        server.Services.Activity.OnLine(new LogLine(ActivityJournalTests.Notification("You have left the channel 'Drake Cutter : Private_Owner'.", 2), 20, generation));
+        var (client, token) = await server.PairAsync();
+        string identity;
+        using (client)
+        {
+            var page = await client.ReceiveTypeAsync("activity");
+            Assert.True(page["channelObservations"]!.GetValue<bool>());
+            var events = page["events"]!.AsArray();
+            Assert.Equal(2, events.Count);
+            identity = events[0]!["channelId"]!.GetValue<string>();
+            Assert.Equal(identity, events[1]!["channelId"]!.GetValue<string>());
+            Assert.DoesNotContain("Private_Owner", page.ToJsonString(), StringComparison.Ordinal);
+        }
+
+        using var reconnect = await server.ConnectAsync();
+        await reconnect.SendAsync($$"""{"v":2,"type":"hello","client":"test","appVersion":"1","deviceName":"test","token":"{{token}}"}""");
+        var replay = await reconnect.ReceiveTypeAsync("activity");
+        Assert.Equal(identity, replay["events"]![0]!["channelId"]!.GetValue<string>());
+    }
+
+    [Fact]
     public async Task ActivityIsPagedAfterAuthenticationAndReplayedWithStableIdentityOnReconnect()
     {
         await using var server = await WssTestServer.StartAsync(activity: true);

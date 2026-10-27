@@ -127,11 +127,13 @@ csmfd-probe --host <ip> --fp <hex> --token <token> --stay 120       # idle clien
 | Commands from the iPad | Received, validated and shown in the Input monitor; in-game effect still to be verified |
 | Game.log: ship context, ClearDriver, QT target, ATC | Implemented; checked on real lines and a 117 MiB archive. The iPad does not consume this state yet |
 | Session rewards/contracts activity feed (41.21) | Implemented; bounded 256-event replay, four-event pages, no BE disk ledger. Build/WSS tests and read-only real-log replay checked; in-game coverage/frametime not measured |
+| Ship-channel observations (41.22) | Implemented in source; existing activity replay forwards join/leave facts. FE owns matching and themes. Windows build/tests pending |
 | Tray, network choice, pairing window, input monitor, icon | Working on the gaming PC |
 | In-game measurements (frametime, input latency, 2 h soak) | Not done |
 
 ## Known limits (honest list)
 
+- Channel observations share 256-event retention; there is no BE membership reducer or durable channel snapshot. Update FE and BE together.
 - Ship control is **assumed** from the ship channel join; ClearDriver ends it. No confirmed seat state exists.
 - QT: only `Player Selected Quantum Target - Local` for the bound ship becomes `destination` (internal name,
   `displayName` null). `freeMode` is never emitted: no verified line yet.

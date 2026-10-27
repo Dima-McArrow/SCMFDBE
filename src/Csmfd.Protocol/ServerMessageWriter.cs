@@ -117,6 +117,7 @@ public static class ServerMessageWriter
         {
             writer.WriteString("sessionId", sessionId);
             writer.WriteString("streamId", page.StreamId);
+            writer.WriteBoolean("channelObservations", true);
             WriteTimestamp(writer, "startedAt", page.StartedAt);
             writer.WriteNumber("firstSeq", page.FirstSeq);
             writer.WriteNumber("latestSeq", page.LatestSeq);
@@ -125,7 +126,7 @@ public static class ServerMessageWriter
             long previous = 0;
             foreach (var item in page.Events)
             {
-                if (item.Seq < page.FirstSeq || item.Seq > page.LatestSeq || item.Seq <= previous
+                if (item.Seq < page.FirstSeq || item.Seq > page.LatestSeq || (previous != 0 && item.Seq != previous + 1)
                     || !ActivityKinds.Contains(item.Kind))
                 {
                     throw new ArgumentException("Invalid activity event.", nameof(page));
@@ -146,9 +147,18 @@ public static class ServerMessageWriter
                     throw new ArgumentException("Invalid reward amount/currency.", nameof(page));
                 }
 
+                var isChannel = item.Kind is "shipChannelJoined" or "shipChannelLeft";
+                if (isChannel ? item.ChannelId is null || item.ChannelId.Length != 64
+                    || !item.ChannelId.All(c => char.IsAsciiHexDigit(c) && !char.IsAsciiLetterUpper(c))
+                    || item.Text.Length == 0 || item.MissionId is not null || item.ObjectiveId is not null
+                    : item.ChannelId is not null)
+                {
+                    throw new ArgumentException("Invalid channel observation.", nameof(page));
+                }
+
                 previous = item.Seq;
                 if (item.MissionId == Guid.Empty
-                    || (item.Kind is not ("reward" or "sessionEnded") && item.MissionId is null))
+                    || (item.Kind is not ("reward" or "sessionEnded" or "shipChannelJoined" or "shipChannelLeft") && item.MissionId is null))
                 {
                     throw new ArgumentException("A contract activity requires a nonzero mission ID.", nameof(page));
                 }
@@ -158,6 +168,11 @@ public static class ServerMessageWriter
                 writer.WriteString("kind", item.Kind);
                 WriteTimestamp(writer, "at", item.At);
                 writer.WriteString("text", item.Text);
+                if (item.ChannelId is { } channelId)
+                {
+                    writer.WriteString("channelId", channelId);
+                }
+
                 if (item.MissionId is { } mission)
                 {
                     writer.WriteString("missionId", mission);
@@ -184,7 +199,7 @@ public static class ServerMessageWriter
     private static readonly HashSet<string> ActivityKinds = new(StringComparer.Ordinal)
     {
         "reward", "contractAccepted", "contractComplete", "contractWithdrawn", "contractFailed",
-        "newObjective", "objectiveComplete", "sessionEnded",
+        "newObjective", "objectiveComplete", "sessionEnded", "shipChannelJoined", "shipChannelLeft",
     };
 
     public static byte[] FullState(Guid sessionId, long seq, StateSnapshot snapshot)

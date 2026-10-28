@@ -24,6 +24,12 @@ public sealed record LocalClearDriver(DateTimeOffset At, string Model, string En
 
 public sealed record HangarRequestCompleted(DateTimeOffset At) : LogEvent(At);
 
+/// <summary>
+/// The player was ejected from a vehicle zone because the vehicle was destroyed (verified on 11 real lines).
+/// Only written while the player is aboard; a ship destroyed without the player is not seen.
+/// </summary>
+public sealed record VehicleDestroyed(DateTimeOffset At, string Model, string EntityId) : LogEvent(At);
+
 /// <summary>Client quit or left the universe (SystemQuit / remote disconnect from SC_Default).</summary>
 public sealed record GameSessionEnded(DateTimeOffset At) : LogEvent(At);
 
@@ -149,6 +155,15 @@ public static partial class GameLogParser
             return ParseNavigation(line);
         }
 
+        if (line.Contains("<[ActorState] Dead>", StringComparison.Ordinal)
+            && line.Contains("due to previous zone being in a destroyed vehicle", StringComparison.Ordinal))
+        {
+            var match = DestroyedVehicleRegex().Match(line);
+            return match.Success && TryTime(line, out var at)
+                ? new VehicleDestroyed(at, StripId(match.Groups["model"].Value), match.Groups["id"].Value)
+                : null;
+        }
+
         if (line.Contains("<SystemQuit>", StringComparison.Ordinal))
         {
             return TryTime(line, out var at) ? new GameSessionEnded(at) : null;
@@ -261,6 +276,9 @@ public static partial class GameLogParser
 
     [GeneratedRegex(@"Player has selected point (?<target>[A-Za-z0-9_\-]+) as their destination", RegexOptions.CultureInvariant, RegexTimeoutMs)]
     private static partial Regex QuantumTargetRegex();
+
+    [GeneratedRegex(@"ejected from zone '(?<model>[A-Za-z0-9_]+)' \[(?<id>\d+)\] to zone '[^']*' \[\d+\] due to previous zone being in a destroyed vehicle", RegexOptions.CultureInvariant, RegexTimeoutMs)]
+    private static partial Regex DestroyedVehicleRegex();
 
     [GeneratedRegex(@"_\d+$", RegexOptions.CultureInvariant, RegexTimeoutMs)]
     private static partial Regex TrailingIdRegex();

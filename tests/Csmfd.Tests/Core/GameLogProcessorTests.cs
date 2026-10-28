@@ -19,6 +19,8 @@ public sealed class GameLogProcessorTests : IDisposable
     private const string Clear = "<2026-10-26T15:58:41.704Z> [Notice] <Vehicle Control Flow> CVehicleMovementBase::ClearDriver: Local client node [100000000001] releasing control token for 'DRAK_Cutter_Rambler_903627021939' [903627021939] [Team_CGP4][Vehicle]";
     private const string Left = "<2026-10-26T15:59:00.000Z> [Notice] <SHUDEvent_OnNotification> Added notification \"You have left the channel 'Drake Cutter Rambler : Test_Pilot'.";
     private const string OtherLeft = "<2026-10-26T15:59:01.000Z> [Notice] <SHUDEvent_OnNotification> Added notification \"You have left the channel 'Anvil C8R Pisces Rescue : Test_Pilot'.";
+    private const string Destroyed = "<2026-10-26T15:59:02.000Z> [Notice] <[ActorState] Dead> [ACTOR STATE][CSCActorControlStateDead::PrePhysicsUpdate] Actor 'Test_Pilot' [100000000001] ejected from zone 'DRAK_Cutter_Rambler_903627021939' [903627021939] to zone 'rockcrack_assembled_003' [862501783927] due to previous zone being in a destroyed vehicle with detached interior. [Team_ActorTech][Actor]";
+    private const string OtherDestroyed = "<2026-10-26T15:59:03.000Z> [Notice] <[ActorState] Dead> [ACTOR STATE][CSCActorControlStateDead::PrePhysicsUpdate] Actor 'Test_Pilot' [100000000001] ejected from zone 'RSI_Perseus_901556573221' [901556573221] to zone 'rockcrack_assembled_003' [862501783927] due to previous zone being in a destroyed vehicle with detached interior. [Team_ActorTech][Actor]";
     private const string Quit = "<2026-10-26T15:59:20.289Z> [Notice] <SystemQuit> CSystem::Quit invoked with - cause=30016, reason=Quit via console command, exitCode=0 [Team_Unknown][System]";
 
     private readonly FakeTimeProvider _time = new(new DateTimeOffset(2026, 10, 26, 15, 56, 0, TimeSpan.Zero));
@@ -151,6 +153,68 @@ public sealed class GameLogProcessorTests : IDisposable
         Feed(Left);
 
         Assert.Equal(2, State.ShipContext.Revision);
+    }
+
+    [Fact]
+    public void DestructionOfOurShipEndsTheContextAndReleasesInput()
+    {
+        Feed(Spawn, Join, NoRoute, Target);
+        PressLights();
+
+        Feed(Destroyed);
+
+        Assert.Null(State.Ship);
+        Assert.Equal(2, State.ShipContext.Revision);
+        Assert.Equal(ShipContextStatus.NoShip, State.ShipContext.Status);
+        Assert.Equal(ShipContextReason.VehicleDestroyed, State.ShipContext.Reason);
+        Assert.Equal(QtTargetState.Unknown, State.QtTarget);
+        Assert.Equal(["0:lv", "0:l^"], _sink.Timeline);
+    }
+
+    // Real logs write the leave and the destruction in either order, and sometimes no leave at all.
+    [Fact]
+    public void DestructionRightAfterLeavingTheChannelStillCounts()
+    {
+        Feed(Spawn, Join, NoRoute, Left, Destroyed);
+
+        Assert.Equal(3, State.ShipContext.Revision);
+        Assert.Equal(ShipContextReason.VehicleDestroyed, State.ShipContext.Reason);
+    }
+
+    [Fact]
+    public void LeavingAfterTheDestructionChangesNothing()
+    {
+        Feed(Spawn, Join, NoRoute, Destroyed, Left);
+
+        Assert.Equal(2, State.ShipContext.Revision);
+        Assert.Equal(ShipContextReason.VehicleDestroyed, State.ShipContext.Reason);
+    }
+
+    [Fact]
+    public void DestructionWithoutBindingFallsBackToModelMatch()
+    {
+        Feed(Join, Destroyed);
+
+        Assert.Equal(ShipContextReason.VehicleDestroyed, State.ShipContext.Reason);
+    }
+
+    [Fact]
+    public void DestructionOfAnotherVehicleChangesNothing()
+    {
+        Feed(Spawn, Join, NoRoute, OtherDestroyed);
+
+        Assert.NotNull(State.Ship);
+        Assert.Equal(1, State.ShipContext.Revision);
+    }
+
+    [Fact]
+    public void DestructionOfTheOldShipAfterJoiningANewOneChangesNothing()
+    {
+        Feed(Spawn, Join, NoRoute, Left, Join.Replace("Drake Cutter Rambler", "RSI Perseus", StringComparison.Ordinal), Destroyed);
+
+        Assert.Equal(3, State.ShipContext.Revision);
+        Assert.Equal(ShipContextReason.ChannelJoined, State.ShipContext.Reason);
+        Assert.Equal("RSI Perseus", State.Ship!.Name);
     }
 
     [Fact]

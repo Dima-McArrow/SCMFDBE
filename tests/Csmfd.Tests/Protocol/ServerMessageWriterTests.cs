@@ -84,6 +84,23 @@ public sealed class ServerMessageWriterTests
     }
 
     [Fact]
+    public void WritesVehicleDestroyedDeltaFixture()
+    {
+        var delta = new StateDelta
+        {
+            Ship = new ShipUpdate(null),
+            ShipContext = new ShipContextState(
+                5, ShipContextStatus.NoShip, ShipContextReason.VehicleDestroyed, ContextId, "DRAK", Midnight.AddMinutes(2)),
+            QtTarget = QtTargetState.Unknown,
+            HangarRequest = HangarRequestState.Idle,
+        };
+
+        Fixture.AssertJsonEqual(
+            Fixture.Read("server-state-delta-vehicle-destroyed.json"),
+            ServerMessageWriter.DeltaState(SessionId, 14, delta));
+    }
+
+    [Fact]
     public void DeltaOmitsUnchangedKeysAndKeepsExplicitNull()
     {
         var onlyQt = JsonNode.Parse(ServerMessageWriter.DeltaState(SessionId, 1, new StateDelta { QtTarget = QtTargetState.Unknown }))!.AsObject();

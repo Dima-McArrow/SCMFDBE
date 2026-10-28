@@ -30,6 +30,9 @@ public enum ShipContextReason
     ChannelLeft,
     GameEnded,
     LogReset,
+
+    /// <summary>The current (or just left) ship was destroyed with the player aboard; the iPad resets its Deck.</summary>
+    VehicleDestroyed,
 }
 
 public enum QtMode

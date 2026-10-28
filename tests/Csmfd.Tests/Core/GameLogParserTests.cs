@@ -87,6 +87,17 @@ public sealed class GameLogParserTests
         Assert.Equal(new ShipChannelLeft(DateTimeOffset.Parse("2026-10-12T18:33:46.921Z", System.Globalization.CultureInfo.InvariantCulture), "RSI Aurora Mk I LN", "Test_Pilot", "RSI"), left);
     }
 
+    [Fact]
+    public void ParsesTheVerifiedVehicleDestroyedLine()
+    {
+        // Real line (2026-10-11 log), player handle anonymised.
+        var parsed = GameLogParser.Parse("<2026-10-11T21:50:53.383Z> [Notice] <[ActorState] Dead> [ACTOR STATE][CSCActorControlStateDead::PrePhysicsUpdate] Actor 'Test_Pilot' [210417741776] ejected from zone 'RSI_Aurora_GS_LN_872969214881' [872969214881] to zone 'social_001_keeger_segment_rckcrk_095' [862501742384] due to previous zone being in a destroyed vehicle with detached interior. [Team_ActorTech][Actor]");
+
+        var destroyed = Assert.IsType<VehicleDestroyed>(parsed);
+        Assert.Equal("RSI_Aurora_GS_LN", destroyed.Model);
+        Assert.Equal("872969214881", destroyed.EntityId);
+    }
+
     private static DateTimeOffset At(string time) =>
         DateTimeOffset.Parse("2026-10-26T" + time + "Z", System.Globalization.CultureInfo.InvariantCulture);
 }

@@ -37,6 +37,9 @@ public sealed partial class GameLogProcessor : IDisposable
     private long _revision;
     private Guid? _contextId;
     private ActiveShip? _active;
+
+    // The ship whose channel was just left: the game writes the leave and the destruction in either order.
+    private ActiveShip? _recent;
     private ShipContextReason _lastReason = ShipContextReason.Startup;
     private ShipContextStatus _status = ShipContextStatus.Unknown;
     private DateTimeOffset? _contextObservedAt;
@@ -97,6 +100,7 @@ public sealed partial class GameLogProcessor : IDisposable
             _observations.Clear();
             _observationOrder.Clear();
             _active = null;
+            _recent = null;
             _contextId = null;
             LogGenerationReset(_logger, generation);
             Transition(ShipContextStatus.Unknown, ShipContextReason.LogReset, _time.GetUtcNow());
@@ -180,6 +184,7 @@ public sealed partial class GameLogProcessor : IDisposable
             case ShipChannelJoined joined:
                 // Every new ship channel join is a new context, even for the same ship (spec 41.9).
                 _active = new ActiveShip(joined.ShipName, joined.Owner, joined.ManufacturerPrefix, joined.At);
+                _recent = null;
                 _contextId = Guid.NewGuid();
                 _lastPrefix = joined.ManufacturerPrefix;
                 TryBind();
@@ -188,6 +193,9 @@ public sealed partial class GameLogProcessor : IDisposable
 
             case ShipChannelLeft left:
                 return ApplyChannelLeft(left);
+
+            case VehicleDestroyed destroyed:
+                return ApplyVehicleDestroyed(destroyed);
 
             case VehicleSpawning spawning:
                 Remember(_spawns, _spawnOrder, spawning.EntityId, spawning);
@@ -245,10 +253,7 @@ public sealed partial class GameLogProcessor : IDisposable
             return false;
         }
 
-        var matches = active.EntityId is { } entityId
-            ? string.Equals(entityId, clear.EntityId, StringComparison.Ordinal)
-            : GameLogParser.ShipNameMatchesModel(active.Name, clear.Model);
-        if (!matches)
+        if (!IsSameVehicle(active, clear.Model, clear.EntityId))
         {
             LogClearDriverIgnored(_logger, clear.EntityId, "another vehicle");
             return false;
@@ -270,9 +275,36 @@ public sealed partial class GameLogProcessor : IDisposable
         }
 
         _active = null;
+        _recent = active;
         Transition(ShipContextStatus.NoShip, ShipContextReason.ChannelLeft, left.At);
         return true;
     }
+
+    /// <summary>
+    /// Destroyed with the player aboard: the current ship, or the one whose channel was left just before.
+    /// Any other vehicle (a ship from long ago, someone else's) changes nothing.
+    /// </summary>
+    private bool ApplyVehicleDestroyed(VehicleDestroyed destroyed)
+    {
+        var ours = (_active is { } active && IsSameVehicle(active, destroyed.Model, destroyed.EntityId))
+            || (_recent is { } recent && IsSameVehicle(recent, destroyed.Model, destroyed.EntityId));
+        if (!ours)
+        {
+            LogDestroyedIgnored(_logger, destroyed.EntityId);
+            return false;
+        }
+
+        _active = null;
+        _recent = null;
+        Transition(ShipContextStatus.NoShip, ShipContextReason.VehicleDestroyed, destroyed.At);
+        return true;
+    }
+
+    /// <summary>The bound entity id decides; before binding, the verified name/model match does.</summary>
+    private static bool IsSameVehicle(ActiveShip ship, string model, string entityId) =>
+        ship.EntityId is { } id
+            ? string.Equals(id, entityId, StringComparison.Ordinal)
+            : GameLogParser.ShipNameMatchesModel(ship.Name, model);
 
     private void ApplyHangarCompleted(HangarRequestCompleted completed, LogLine line)
     {
@@ -324,6 +356,7 @@ public sealed partial class GameLogProcessor : IDisposable
         }
 
         _active = null;
+        _recent = null;
         Transition(ShipContextStatus.NoShip, ShipContextReason.GameEnded, at);
         return true;
     }
@@ -447,6 +480,9 @@ public sealed partial class GameLogProcessor : IDisposable
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "Left channel of {Ship} ignored: not the current ship channel")]
     private static partial void LogChannelLeftIgnored(ILogger logger, string ship);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Destroyed vehicle {EntityId} ignored: not the current or just-left ship")]
+    private static partial void LogDestroyedIgnored(ILogger logger, string entityId);
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "QT destination {Target} accepted for entity {EntityId}")]
     private static partial void LogQtAccepted(ILogger logger, string target, string entityId);

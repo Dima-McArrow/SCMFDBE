@@ -489,6 +489,7 @@ public static class ServerMessageWriter
         ShipContextReason.ChannelLeft => "channelLeft",
         ShipContextReason.GameEnded => "gameEnded",
         ShipContextReason.LogReset => "logReset",
+        ShipContextReason.VehicleDestroyed => "vehicleDestroyed",
         _ => throw new ArgumentOutOfRangeException(nameof(value)),
     };
 

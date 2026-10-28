@@ -1,0 +1,18 @@
+{
+  "v": 2,
+  "type": "state",
+  "sessionId": "7a42291e-21db-4ac5-a3e1-ea278bb54900",
+  "seq": 14,
+  "partial": true,
+  "ship": null,
+  "shipContext": {
+    "revision": 5,
+    "status": "noShip",
+    "reason": "vehicleDestroyed",
+    "contextId": "e21848e3-803a-4257-8706-53df116bf9ce",
+    "manufacturerPrefix": "DRAK",
+    "observedAt": "2026-10-27T00:02:00.000Z"
+  },
+  "qtTarget": { "mode": "unknown", "internalName": null, "displayName": null, "confidence": "stale", "observedAt": null },
+  "hangarRequest": { "status": "idle", "commandId": null, "contextId": null, "since": null, "updatedAt": null }
+}

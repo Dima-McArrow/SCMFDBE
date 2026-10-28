@@ -357,6 +357,82 @@ public sealed class InputExecutorTests : IDisposable
         Assert.Equal(["0:f12v", "60:f12^", "360:text(/wave)", "460:enterv", "520:enter^"], _sink.Timeline);
     }
 
+    [Theory]
+    [InlineData("alt")]
+    [InlineData("ctrl")]
+    [InlineData("shift")]
+    [InlineData("ralt")]
+    [InlineData("enter")]
+    public void ChatPhysicalConflictAtSubmissionRejectsWithoutEnterAndExecutorCanRecover(string physicalKey)
+    {
+        var chat = Chat("/wave");
+        _time.Advance(TimeSpan.FromMilliseconds(60));
+        _time.Advance(TimeSpan.FromMilliseconds(300));
+        Assert.DoesNotContain(_output.Acks, a => a.Command == chat);
+
+        _keyboard.Down.Add(physicalKey);
+        _time.Advance(TimeSpan.FromMilliseconds(100));
+
+        Assert.Equal(["0:enterv", "60:enter^", "360:text(/wave)"], _sink.Timeline);
+        Assert.Equal((AckStatus.Rejected, RejectReason.Busy), _output.AckFor(chat));
+        Assert.Single(_output.Acks);
+        Assert.False(_executor.HasActiveInput);
+        Assert.False(_executor.IsBlocked);
+        Assert.Equal(0, _output.BlockedCount);
+
+        _keyboard.Down.Remove(physicalKey);
+        _time.Advance(TimeSpan.FromSeconds(1));
+
+        Assert.Equal(["0:enterv", "60:enter^", "360:text(/wave)"], _sink.Timeline);
+        Assert.Equal((AckStatus.Rejected, RejectReason.Busy), _output.AckFor(chat));
+        Assert.Single(_output.Acks);
+
+        var next = Submit("lights", KeyPhase.Down);
+        Assert.Equal((AckStatus.Sent, (RejectReason?)null), _output.AckFor(next));
+        Assert.True(_executor.HasActiveInput);
+    }
+
+    [Fact]
+    public void ChatAltReleasedBeforeSubmissionAllowsNormalCompletion()
+    {
+        var chat = Chat("/wave");
+        _time.Advance(TimeSpan.FromMilliseconds(60));
+        _time.Advance(TimeSpan.FromMilliseconds(300));
+
+        _keyboard.Down.Add("alt");
+        _time.Advance(TimeSpan.FromMilliseconds(50));
+        _keyboard.Down.Remove("alt");
+        _time.Advance(TimeSpan.FromMilliseconds(50));
+        Assert.DoesNotContain(_output.Acks, a => a.Command == chat);
+        _time.Advance(TimeSpan.FromMilliseconds(60));
+
+        Assert.Equal(["0:enterv", "60:enter^", "360:text(/wave)", "460:enterv", "520:enter^"], _sink.Timeline);
+        Assert.Equal((AckStatus.Sent, (RejectReason?)null), _output.AckFor(chat));
+        Assert.Single(_output.Acks);
+        Assert.False(_executor.HasActiveInput);
+        Assert.False(_executor.IsBlocked);
+    }
+
+    [Theory]
+    [InlineData(GameFocus.Background)]
+    [InlineData(GameFocus.NotRunning)]
+    public void ChatLosingFocusAfterTextRejectsBeforePhysicalConflict(GameFocus focus)
+    {
+        var chat = Chat("/wave");
+        _time.Advance(TimeSpan.FromMilliseconds(60));
+        _time.Advance(TimeSpan.FromMilliseconds(300));
+
+        _game.Focus = focus;
+        _keyboard.Down.Add("alt");
+        _time.Advance(TimeSpan.FromMilliseconds(100));
+
+        Assert.Equal(["0:enterv", "60:enter^", "360:text(/wave)"], _sink.Timeline);
+        Assert.Equal((AckStatus.Rejected, RejectReason.GameNotFocused), _output.AckFor(chat));
+        Assert.Single(_output.Acks);
+        Assert.False(_executor.HasActiveInput);
+        Assert.False(_executor.IsBlocked);
+    }
+
     [Fact]
     public void ChatLosingFocusNeverPressesEnter()
     {

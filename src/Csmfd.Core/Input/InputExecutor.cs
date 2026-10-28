@@ -369,12 +369,17 @@ public sealed class InputExecutor : IDisposable
                 return RejectReason.GameNotFocused;
         }
 
+        return HasPhysicalConflict(keys) ? RejectReason.Busy : null;
+    }
+
+    private bool HasPhysicalConflict(IReadOnlyList<string> keys)
+    {
         // A physically held modifier or the same key would merge with our input (e.g. N -> Alt+N).
         foreach (var modifier in ModifierOrder)
         {
             if (_keyboard.IsDown(modifier))
             {
-                return RejectReason.Busy;
+                return true;
             }
         }
 
@@ -382,11 +387,11 @@ public sealed class InputExecutor : IDisposable
         {
             if (_keyboard.IsDown(key))
             {
-                return RejectReason.Busy;
+                return true;
             }
         }
 
-        return null;
+        return false;
     }
 
     private void OnTimer(long token)
@@ -461,6 +466,12 @@ public sealed class InputExecutor : IDisposable
                 if (_game.Check() != GameFocus.Focused)
                 {
                     AbortChat(gesture, RejectReason.GameNotFocused);
+                    return;
+                }
+
+                if (HasPhysicalConflict(["enter"]))
+                {
+                    AbortChat(gesture, RejectReason.Busy);
                     return;
                 }
 

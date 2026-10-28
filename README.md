@@ -4,13 +4,61 @@ Minimal, secured Windows companion for the CSMFD iPad MFD (Star Citizen). It acc
 commands from **one paired iPad**, injects them into the focused game with `SendInput`, reads new
 `Game.log` lines and publishes a compact state.
 
-The iPad app (SwiftUI) is a separate repository, `SCMFD`, usually checked out next to this one. Contract:
-**protocol v2**, section 41 of `..\SCMFD\Claude outputs\CSMFD-discussion.md`. Section 40 (v1) is historical and
+The [SCMFD iPad app](https://github.com/Dima-McArrow/SCMFD) (SwiftUI) is a separate repository, usually checked out
+next to this one. Contract: **protocol v2**, section 41 of the
+[shared specification](https://github.com/Dima-McArrow/SCMFD/blob/main/Claude%20outputs/CSMFD-discussion.md)
+(`..\SCMFD\Claude outputs\CSMFD-discussion.md` locally). Section 40 (v1) is historical and
 not implemented. Agent and contributor rules: [`CLAUDE.md`](CLAUDE.md); design report (Russian):
 [`docs/SERVER-IMPLEMENTATION.md`](docs/SERVER-IMPLEMENTATION.md).
 
 What it deliberately does **not** do: no web UI, no REST, no cloud/accounts/analytics, no screen capture/OCR,
 no memory reading, no DLL injection or driver, no arbitrary macros or key names, no auto-update, no admin rights.
+
+## Two repositories, one companion
+
+| Repository | Role | Runs on |
+|---|---|---|
+| [SCMFD](https://github.com/Dima-McArrow/SCMFD) | Touch controls, themes, observed activity and local history | iPad |
+| [SCMFDBE](https://github.com/Dima-McArrow/SCMFDBE) (this repository) | Game input, log observations, pairing and secure transport | Windows gaming PC |
+
+For connected use, build this server and the [iPad app](https://github.com/Dima-McArrow/SCMFD#build-and-test).
+Put both devices on the same private network, follow [First start](#first-start), then use **Connect to PC**
+in the app. Update both sides together when the shared protocol changes.
+
+## Why SCMFD?
+
+**Touch controls and log-driven information, together on a native iPad MFD.** SCMFD combines a cockpit-style
+control surface with feedback from the events Star Citizen exposes in `Game.log`. The aim is to make useful
+log observations visible beside the controls you use, and expand that feedback as more event formats are verified.
+
+- **A cockpit that follows your ship.** With Auto theme enabled, a recognized ship-channel join switches the
+  interface to the ship manufacturer's theme. Leaving the ship channel returns it to the default SCMFD theme.
+  The 18 manufacturer themes bring their own palettes, fonts, key shapes and HUD details; manual selection
+  remains available.
+- **Your selected quantum destination beside Engage.** When a starmap selection is reported in the log, the
+  Quantum page shows its target name directly above the Engage key. Target names can still be technical names;
+  the app displays what the server actually observes.
+- **Feedback beyond button presses.** Landing requests show pending, answered or timeout status. Observed
+  contracts, objectives and rewards populate the session pages, while the read-only Party tab shows observed
+  members, the last known leader and membership events, with explicit uncertainty when information is incomplete.
+- **Native touch interaction.** SwiftUI controls, timed holds, a slide-to-arm for self-destruct, interface sounds
+  and English/French/Russian text make the iPad a dedicated companion display.
+- **A direct local connection.** The iPad talks to its Windows companion over the private network. Normal
+  operation requires no project account, cloud service, AI provider or subscription. The PC reuses one log reader;
+  presentation and history belong to the iPad.
+
+Input is restricted to an allowlist, checked against game focus and physical-key conflicts, with release paths
+for disconnects and other safety events. Log-derived information is partial; current validation and remaining
+limits are documented below. No game-memory access or modification is used.
+
+### Respect to fellow companion projects
+
+Much respect to [GameGlass](https://gameglass.gg/) for its touchscreen game-control panels and to
+[Wingman AI](https://www.wingman-ai.com/) for showing how Star Citizen's game log can inform a companion's
+responses to game events. SCMFD brings these two ideas together in its own form: a native iPad touch interface
+and visual feedback driven by verified `Game.log` observations. It has no voice assistant; the shared idea with
+Wingman AI here is reading the game log. Thanks to both teams and their communities for advancing companion
+experiences in the 'verse.
 
 ## Requirements
 

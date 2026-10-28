@@ -1,0 +1,38 @@
+{
+  "v": 2,
+  "type": "activity",
+  "sessionId": "7a42291e-21db-4ac5-a3e1-ea278bb54900",
+  "streamId": "982ba1b6-1aa8-4e7e-a73b-9a9e51abb8d1",
+  "startedAt": "2026-10-27T12:00:00.000Z",
+  "firstSeq": 1,
+  "latestSeq": 4,
+  "ended": false,
+  "events": [
+    {
+      "seq": 1,
+      "kind": "partyJoined",
+      "at": "2026-10-27T12:00:01.000Z",
+      "text": ""
+    },
+    {
+      "seq": 2,
+      "kind": "partyMemberJoined",
+      "at": "2026-10-27T12:00:02.000Z",
+      "text": "Pilot_One"
+    },
+    {
+      "seq": 3,
+      "kind": "partyLeaderChanged",
+      "at": "2026-10-27T12:00:03.000Z",
+      "text": "Pilot_One"
+    },
+    {
+      "seq": 4,
+      "kind": "reward",
+      "at": "2026-10-27T12:00:04.000Z",
+      "text": "Awarded 500 aUEC:",
+      "amount": 500,
+      "currency": "aUEC"
+    }
+  ]
+}

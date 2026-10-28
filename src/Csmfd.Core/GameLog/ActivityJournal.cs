@@ -178,6 +178,11 @@ public sealed partial class ActivityJournal
             amount = value;
             currency = reward.Groups["currency"].Value;
         }
+        else if (TryParty(body, out var partyKind, out var partyName))
+        {
+            kind = partyKind;
+            body = partyName;
+        }
         else
         {
             foreach (var (prefix, eventKind) in Prefixes)
@@ -198,7 +203,13 @@ public sealed partial class ActivityJournal
 
         var mission = MissionRegex().Match(notification);
         Guid? missionId = mission.Success && Guid.TryParse(mission.Groups[1].Value, out var id) && id != Guid.Empty ? id : null;
-        if (kind != "reward" && missionId is null)
+        var isParty = PartyActivity.IsKind(kind);
+        if (isParty)
+        {
+            // Social notifications carry no contract identity. Do not invent one.
+            missionId = null;
+        }
+        if (!isParty && kind != "reward" && missionId is null)
         {
             return false;
         }
@@ -216,11 +227,56 @@ public sealed partial class ActivityJournal
         }
 
         var objective = ObjectiveRegex().Match(notification);
-        var objectiveId = objective.Success && TextRules.IsValidText(objective.Groups[1].Value, 1, ActivityLimits.ObjectiveScalars)
+        var objectiveId = !isParty && objective.Success && TextRules.IsValidText(objective.Groups[1].Value, 1, ActivityLimits.ObjectiveScalars)
             ? objective.Groups[1].Value : null;
         Add(kind, _notificationAt, Clean(body, ActivityLimits.TextScalars), missionId, objectiveId, amount, currency);
         return true;
     }
+
+    private static bool TryParty(string body, out string kind, out string name)
+    {
+        var text = body.TrimEnd(':').TrimEnd();
+        name = string.Empty;
+        kind = text switch
+        {
+            "You have created party" => "partyCreated",
+            "You have joined party" => "partyJoined",
+            "Party Disbanded The party has been disbanded." => "partyDisbanded",
+            _ => string.Empty,
+        };
+        if (kind.Length != 0)
+        {
+            return true;
+        }
+
+        foreach (var (prefix, suffix, eventKind) in PartyPatterns)
+        {
+            if (!text.StartsWith(prefix, StringComparison.Ordinal) || !text.EndsWith(suffix, StringComparison.Ordinal)
+                || text.Length <= prefix.Length + suffix.Length)
+            {
+                continue;
+            }
+
+            var candidate = text[prefix.Length..^suffix.Length];
+            if (!PartyActivity.IsValidText(eventKind, candidate))
+            {
+                return false;
+            }
+
+            kind = eventKind;
+            name = candidate;
+            return true;
+        }
+
+        return false;
+    }
+
+    private static readonly (string Prefix, string Suffix, string Kind)[] PartyPatterns =
+    [
+        ("New Member Joined ", " has joined the party.", "partyMemberJoined"),
+        ("Member Left ", " has left the party.", "partyMemberLeft"),
+        ("New Party Leader ", " is now party leader.", "partyLeaderChanged"),
+    ];
 
     private void Add(string kind, DateTimeOffset at, string text, Guid? missionId, string? objectiveId, long? amount, string? currency)
     {

@@ -146,9 +146,16 @@ public static class ServerMessageWriter
                     throw new ArgumentException("Invalid reward amount/currency.", nameof(page));
                 }
 
+                var isParty = PartyActivity.IsKind(item.Kind);
+                if (isParty && (!PartyActivity.IsValidText(item.Kind, item.Text)
+                    || item.MissionId is not null || item.ObjectiveId is not null))
+                {
+                    throw new ArgumentException("Invalid party observation.", nameof(page));
+                }
+
                 previous = item.Seq;
                 if (item.MissionId == Guid.Empty
-                    || (item.Kind is not ("reward" or "sessionEnded") && item.MissionId is null))
+                    || (!isParty && item.Kind is not ("reward" or "sessionEnded") && item.MissionId is null))
                 {
                     throw new ArgumentException("A contract activity requires a nonzero mission ID.", nameof(page));
                 }
@@ -186,6 +193,7 @@ public static class ServerMessageWriter
     {
         "reward", "contractAccepted", "contractComplete", "contractWithdrawn", "contractFailed",
         "newObjective", "objectiveComplete", "sessionEnded",
+        "partyCreated", "partyJoined", "partyMemberJoined", "partyMemberLeft", "partyLeaderChanged", "partyDisbanded",
     };
 
     public static byte[] FullState(Guid sessionId, long seq, StateSnapshot snapshot)

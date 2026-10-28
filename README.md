@@ -123,6 +123,7 @@ csmfd-probe --host <ip> --fp <hex> --token <token> --stay 120       # idle clien
 
 | Part | State |
 |---|---|
+| Observed Party MVP (41.24) | Six notification facts through the existing bounded activity journal; no BE roster/calculations. Requires updated iPad app; Mac and in-game verification pending |
 | Protocol v2, WSS/TLS with pinning, pairing, revoke | Implemented and tested; works with the iPad app over the LAN (2026-10-27) |
 | Commands from the iPad | Received, validated and shown in the Input monitor; in-game effect still to be verified |
 | Game.log: ship channel join/leave, vehicle destroyed, QT target, ATC | Implemented; checked on real logs (join verified live 2026-10-28, destruction replayed on every real log that has one). Drives the iPad Deck and theme through `shipContext` (iPad `FIX-07`) |
@@ -166,3 +167,21 @@ See section 41.21 in the FE specification and `SESSION-REWARDS-CONTRACTS.md` in 
 
 See [SESSION-RELIABILITY-FIXES.md](SESSION-RELIABILITY-FIXES.md) for the observed failures, source fixes,
 verification results and the remaining Mac/game checks.
+
+## Observed Party MVP (2026-10-28)
+
+Party is read-only and always potentially incomplete. The PC emits only validated create/join, member
+join/leave, leader and disband facts. All roster/history/confidence calculations run on the iPad. No extra
+reader, polling or BE persistence. Party shares the 256-event replay with rewards/contracts.
+
+No authoritative roster, local PU leave/kick, alias mapping or shard continuity is established.
+Invites, marker stream-out and launch acceptances do not update membership. Update both sides together;
+older activity clients may label new kinds as incomplete finance history. The running server is not replaced
+automatically. See protocol section 41.24 in the iPad repository for the wire contract and test scenario.
+
+Party validation on Windows: Release build passed with zero warnings; all 399 BE tests passed,
+including mixed Party/reward WSS paging, reconnect replay and denial to unpaired clients. Formatting check
+passed. A read-only replay of 37 real logs (2,621,104 lines) produced 43 Party facts, matching the independent
+source scan: 1 creation, 6 local joins, 7 member joins, 16 member leaves, 10 leader changes and 3 disbands.
+Swift tests are added but cannot run on this Windows machine. Before in-game testing, build/test the iPad
+app on Mac and use the matching updated BE build. Check the Party tab in portrait/landscape and en/fr/ru.

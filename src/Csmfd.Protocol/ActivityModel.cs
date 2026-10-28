@@ -1,6 +1,7 @@
 namespace Csmfd.Protocol;
 
-public sealed record ActivityEvent(long Seq, string Kind, DateTimeOffset At, string Text, Guid? MissionId, string? ObjectiveId, long? Amount, string? Currency, string? ChannelId = null);
+/// <summary>A reward, contract step or session end. Ship channels are not activity (they drive the state message).</summary>
+public sealed record ActivityEvent(long Seq, string Kind, DateTimeOffset At, string Text, Guid? MissionId, string? ObjectiveId, long? Amount, string? Currency);
 
 /// <summary>A bounded page of observed log events, independent of coalesced ship state.</summary>
 public sealed record ActivityPage(Guid StreamId, DateTimeOffset StartedAt, long FirstSeq, long LatestSeq, bool Ended, IReadOnlyList<ActivityEvent> Events);

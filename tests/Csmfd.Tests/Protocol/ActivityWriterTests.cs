@@ -5,28 +5,13 @@ namespace Csmfd.Tests.Protocol;
 
 public sealed class ActivityWriterTests
 {
-    [Fact]
-    public void WritesSharedChannelFixture()
-    {
-        var at = new DateTimeOffset(2026, 10, 27, 12, 0, 0, TimeSpan.Zero);
-        var channel = new string('a', 64);
-        ActivityEvent[] events =
-        [
-            new(1, "shipChannelJoined", at.AddSeconds(1), "Drake Vulture Teach's Special", null, null, null, null, channel),
-            new(2, "shipChannelLeft", at.AddSeconds(2), "Drake Vulture Teach's Special", null, null, null, null, channel),
-        ];
-        var page = new ActivityPage(Guid.Parse("982ba1b6-1aa8-4e7e-a73b-9a9e51abb8d1"), at, 1, 2, false, events);
-        Fixture.AssertJsonEqual(Fixture.Read("server-activity-channels.json"),
-            ServerMessageWriter.Activity(Guid.Parse("7a42291e-21db-4ac5-a3e1-ea278bb54900"), page));
-    }
-
     [Theory]
-    [InlineData(null)]
-    [InlineData("bad")]
-    public void ChannelObservationsRequireAnOpaqueIdentity(string? channel)
+    [InlineData("shipChannelJoined")]
+    [InlineData("shipChannelLeft")]
+    public void ShipChannelKindsAreNotActivity(string kind)
     {
         var at = DateTimeOffset.UnixEpoch;
-        var item = new ActivityEvent(1, "shipChannelLeft", at, "Drake Cutter", null, null, null, null, channel);
+        var item = new ActivityEvent(1, kind, at, "Drake Cutter", null, null, null, null);
         Assert.Throws<ArgumentException>(() => ServerMessageWriter.Activity(Guid.NewGuid(), new ActivityPage(Guid.NewGuid(), at, 1, 1, false, [item])));
     }
 

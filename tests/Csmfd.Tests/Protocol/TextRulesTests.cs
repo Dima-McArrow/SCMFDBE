@@ -6,10 +6,10 @@ public sealed class TextRulesTests
 {
     // The iPad rejects control (Cc) and format (Cf) characters alike (spec 41.21).
     [Theory]
-    [InlineData("Deliver­cargo")]
-    [InlineData("Deliver​cargo")]
-    [InlineData("Deliver‍cargo")]
-    [InlineData("﻿Deliver cargo")]
+    [InlineData("Deliver\u00ADcargo")]
+    [InlineData("Deliver\u200Bcargo")]
+    [InlineData("Deliver\u200Dcargo")]
+    [InlineData("\uFEFFDeliver cargo")]
     [InlineData("Deliver\tcargo")]
     [InlineData("Deliver\ncargo")]
     public void RejectsControlAndFormatCharacters(string text)

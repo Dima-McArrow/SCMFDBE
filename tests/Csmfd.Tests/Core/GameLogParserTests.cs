@@ -79,8 +79,8 @@ public sealed class GameLogParserTests
 
     // The ship name goes on the wire, and the writer refuses control and format characters.
     [Theory]
-    [InlineData("You have joined channel 'Drake Cutter­Rambler : Test_Pilot'.")]
-    [InlineData("You have left the channel 'RSI Aurora​ Mk I LN : Test_Pilot'.")]
+    [InlineData("You have joined channel 'Drake Cutter\u00ADRambler : Test_Pilot'.")]
+    [InlineData("You have left the channel 'RSI Aurora\u200B Mk I LN : Test_Pilot'.")]
     [InlineData("You have joined channel 'Drake Cutter\tRambler : Test_Pilot'.")]
     public void ShipChannelWithAnUnwritableNameIsIgnored(string notification)
     {

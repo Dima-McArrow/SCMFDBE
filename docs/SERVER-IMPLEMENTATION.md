@@ -1,5 +1,7 @@
 # CSMFD Server — реализация Windows BE (MVP)
 
+> **Частично устарел после спеки 41.23 (2026-10-28):** ClearDriver больше не переход ship context и не wire reason, он только отпускает удерживаемый ввод; ship context следует за корабельным каналом (`channelJoined` / `channelLeft` / `vehicleDestroyed` / `gameEnded` / `logReset`); события каналов ушли из activity. Устарела, в частности, фраза в §5.2 «ClearDriver и переходы контекста идут без debounce»: без debounce идут только переходы контекста.
+
 Дата: 27 октября 2026 года, обновлён вечером того же дня после первой связки с iPad. Репозиторий: `C:\Users\Dimitri\Dev\SCMFDBE`.
 Основание: раздел 41 документа `CSMFD-discussion.md` (целевой защищённый протокол v2). Раздел 40 (v1) не реализовывался.
 

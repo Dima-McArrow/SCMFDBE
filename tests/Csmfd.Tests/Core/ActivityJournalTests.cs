@@ -76,7 +76,7 @@ public sealed class ActivityJournalTests
     [Fact]
     public void ContractTitleLosesFormatCharactersAndKeepsNonAsciiLetters()
     {
-        _journal.OnLine(new LogLine(Notification("Contract Accepted: Liv­raison à Ori​son: ", mission: Mission), 10, Generation));
+        _journal.OnLine(new LogLine(Notification("Contract Accepted: Liv\u00ADraison à Ori\u200Bson: ", mission: Mission), 10, Generation));
         var item = Assert.Single(_journal.Read(null, 0)!.Events);
         Assert.Equal("contractAccepted", item.Kind);
         Assert.Equal("Livraison à Orison", item.Text);

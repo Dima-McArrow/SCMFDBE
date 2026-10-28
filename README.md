@@ -139,6 +139,8 @@ csmfd-probe --host <ip> --fp <hex> --token <token> --stay 120       # idle clien
   is not detected yet: no verified line.
 - A remote disconnect from `SC_Default` counts as game end; if the game reconnects to the same session (30k),
   the ship context stays ended until the next channel join.
+- A ship channel whose ship name contains a control (Cc) or format (Cf) character, or is longer than the name
+  limit (128 scalars), is ignored (`GameLogParser`): the iPad Deck does not turn on and the theme does not change.
 - QT: only `Player Selected Quantum Target - Local` for the bound ship becomes `destination` (internal name,
   `displayName` null). `freeMode` is never emitted: no verified line yet.
 - ATC `answered` means a hangar notification arrived after our request in the same context; there is no

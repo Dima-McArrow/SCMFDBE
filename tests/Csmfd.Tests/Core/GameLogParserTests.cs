@@ -28,6 +28,8 @@ public sealed class GameLogParserTests
 
     [Theory]
     [InlineData("""<2026-10-26T15:56:32.460Z>    "You have joined channel 'Drake Cutter Rambler : Test_Pilot'.""")]
+    [InlineData("""<2026-10-12T18:33:46.921Z>    "You have left the channel 'RSI Aurora Mk I LN : Test_Pilot'.""")]
+    [InlineData("""<2026-10-12T18:33:46.925Z> [Notice] <UpdateNotificationItem> Notification "You have left the channel 'RSI Aurora Mk I LN : Test_Pilot'.""")]
     [InlineData("""<2026-10-26T15:56:53.896Z>    "Hangar Request Completed: " [10]""")]
     [InlineData("""<2026-10-26T15:56:32.460Z> [Notice] <SHUDEvent_OnNotification> Added notification "You have joined channel 'General : Stanton'.""")]
     [InlineData("""<2026-10-26T15:56:32.460Z> [Notice] <SHUDEvent_OnNotification> Added notification "You have joined channel 'Drakeville Social : Someone'.""")]
@@ -73,6 +75,16 @@ public sealed class GameLogParserTests
         var parsed = GameLogParser.Parse("<2026-10-27T23:14:15.499Z> [Notice] <SHUDEvent_OnNotification> Added notification \"You have joined channel 'Drake Vulture Teach's Special : Test_Pilot'.");
         var joined = Assert.IsType<ShipChannelJoined>(parsed);
         Assert.Equal("Drake Vulture Teach's Special", joined.ShipName);
+    }
+
+    [Fact]
+    public void ParsesTheVerifiedShipChannelLeaveLine()
+    {
+        // Real line shape (2026-10-12 log), owner anonymised.
+        var parsed = GameLogParser.Parse("<2026-10-12T18:33:46.921Z> [Notice] <SHUDEvent_OnNotification> Added notification \"You have left the channel 'RSI Aurora Mk I LN : Test_Pilot'.");
+
+        var left = Assert.IsType<ShipChannelLeft>(parsed);
+        Assert.Equal(new ShipChannelLeft(DateTimeOffset.Parse("2026-10-12T18:33:46.921Z", System.Globalization.CultureInfo.InvariantCulture), "RSI Aurora Mk I LN", "Test_Pilot", "RSI"), left);
     }
 
     private static DateTimeOffset At(string time) =>

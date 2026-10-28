@@ -17,6 +17,8 @@ public sealed class GameLogProcessorTests : IDisposable
     private const string OtherTarget = "<2026-10-26T15:57:20.000Z> [Notice] <Player Selected Quantum Target - Local> [ItemNavigation][CL][4976] | NOT AUTH | MRAI_Guardian_MX_Collector_Military_902412078691[902412078691]|CSCItemNavigation::OnPlayerSelectedQuantumTarget|Player has selected point rs_ext_pyro6_leo as their destination, routing locally [Team_CGP4][QuantumTravel]";
     private const string OtherClear = "<2026-10-26T15:58:00.000Z> [Notice] <Vehicle Control Flow> CVehicleMovementBase::ClearDriver: Local client node [100000000001] releasing control token for 'RSI_Perseus_901556573221' [901556573221] [Team_CGP4][Vehicle]";
     private const string Clear = "<2026-10-26T15:58:41.704Z> [Notice] <Vehicle Control Flow> CVehicleMovementBase::ClearDriver: Local client node [100000000001] releasing control token for 'DRAK_Cutter_Rambler_903627021939' [903627021939] [Team_CGP4][Vehicle]";
+    private const string Left = "<2026-10-26T15:59:00.000Z> [Notice] <SHUDEvent_OnNotification> Added notification \"You have left the channel 'Drake Cutter Rambler : Test_Pilot'.";
+    private const string OtherLeft = "<2026-10-26T15:59:01.000Z> [Notice] <SHUDEvent_OnNotification> Added notification \"You have left the channel 'Anvil C8R Pisces Rescue : Test_Pilot'.";
     private const string Quit = "<2026-10-26T15:59:20.289Z> [Notice] <SystemQuit> CSystem::Quit invoked with - cause=30016, reason=Quit via console command, exitCode=0 [Team_Unknown][System]";
 
     private readonly FakeTimeProvider _time = new(new DateTimeOffset(2026, 10, 26, 15, 56, 0, TimeSpan.Zero));
@@ -81,20 +83,48 @@ public sealed class GameLogProcessorTests : IDisposable
     }
 
     [Fact]
-    public void ClearDriverOfOurShipEndsContextKeepsThemeAndReleasesInput()
+    public void ClearDriverOfOurShipReleasesInputButKeepsTheShipContext()
     {
         Feed(Spawn, Join, NoRoute, Target);
-        var contextId = State.ShipContext.ContextId;
-        _executor.Submit(Guid.NewGuid(), new KeyCommand(Guid.NewGuid(), ActionCatalog.All["lights"], KeyPhase.Down, null), _time.GetTimestamp());
+        PressLights();
 
         Feed(OtherClear);
-        Assert.NotNull(State.Ship);
+        Assert.Equal(["0:lv"], _sink.Timeline); // another vehicle: nothing released
 
         Feed(Clear);
+        Assert.Equal(["0:lv", "0:l^"], _sink.Timeline);
+        Assert.NotNull(State.Ship);
+        Assert.Equal(1, State.ShipContext.Revision);
+        Assert.Equal(ShipContextStatus.Assumed, State.ShipContext.Status);
+        Assert.Equal(ShipContextReason.ChannelJoined, State.ShipContext.Reason);
+        Assert.Equal("Stanton4a", State.QtTarget.InternalName);
+    }
+
+    [Fact]
+    public void ClearDriverWithoutBindingFallsBackToModelMatch()
+    {
+        Feed(Join);
+        PressLights();
+
+        Feed(Clear);
+
+        Assert.Equal(["0:lv", "0:l^"], _sink.Timeline);
+        Assert.Equal(ShipContextReason.ChannelJoined, State.ShipContext.Reason);
+    }
+
+    [Fact]
+    public void LeavingOurShipChannelEndsTheContextAndReleasesInput()
+    {
+        Feed(Spawn, Join, NoRoute, Target, Clear);
+        var contextId = State.ShipContext.ContextId;
+        PressLights();
+
+        Feed(Left);
+
         Assert.Null(State.Ship);
         Assert.Equal(2, State.ShipContext.Revision);
         Assert.Equal(ShipContextStatus.NoShip, State.ShipContext.Status);
-        Assert.Equal(ShipContextReason.ClearDriver, State.ShipContext.Reason);
+        Assert.Equal(ShipContextReason.ChannelLeft, State.ShipContext.Reason);
         Assert.Equal(contextId, State.ShipContext.ContextId);
         Assert.Equal("DRAK", State.ShipContext.ManufacturerPrefix);
         Assert.Equal(QtTargetState.Unknown, State.QtTarget);
@@ -102,24 +132,25 @@ public sealed class GameLogProcessorTests : IDisposable
     }
 
     [Fact]
-    public void ClearDriverWithoutBindingFallsBackToModelMatch()
+    public void LeavingAnotherChannelChangesNothing()
     {
-        Feed(Join, Clear);
+        Feed(Join);
 
-        Assert.Null(State.Ship);
-        Assert.Equal(ShipContextReason.ClearDriver, State.ShipContext.Reason);
+        Feed(OtherLeft, Left.Replace("Test_Pilot", "Someone_Else", StringComparison.Ordinal));
+
+        Assert.NotNull(State.Ship);
+        Assert.Equal(1, State.ShipContext.Revision);
+        Assert.Equal(ShipContextReason.ChannelJoined, State.ShipContext.Reason);
     }
 
     [Fact]
-    public void RepeatedClearDriverAfterManualOverrideProducesNewRevision()
+    public void LeavingAfterTheContextEndedChangesNothing()
     {
-        Feed(Spawn, Join, NoRoute, Clear);
+        Feed(Join, Left);
+
+        Feed(Left);
+
         Assert.Equal(2, State.ShipContext.Revision);
-
-        Feed(Clear);
-
-        Assert.Equal(3, State.ShipContext.Revision);
-        Assert.Equal(ShipContextStatus.NoShip, State.ShipContext.Status);
     }
 
     [Fact]
@@ -182,6 +213,9 @@ public sealed class GameLogProcessorTests : IDisposable
         _processor.OnInputStarted(Guid.NewGuid(), ActionCatalog.All["requestLanding"]);
 
         Feed(Clear);
+        Assert.Equal(HangarRequestStatus.Pending, State.HangarRequest.Status); // seat exit is not a context change
+
+        Feed(Left);
 
         Assert.Equal(HangarRequestState.Idle, State.HangarRequest);
         _time.Advance(GameLogProcessor.HangarTimeout);
@@ -229,13 +263,13 @@ public sealed class GameLogProcessorTests : IDisposable
 
         Assert.Null(State.Ship);
         Assert.Equal(ShipContextReason.GameEnded, State.ShipContext.Reason);
-        Assert.Equal(3, State.ShipContext.Revision); // join, ClearDriver, game ended
+        Assert.Equal(2, State.ShipContext.Revision); // join, game ended (ClearDriver is not a transition)
     }
 
     [Fact]
     public void DebugLogExplainsDecisionsWithoutThePlayerHandle()
     {
-        Feed(Spawn, Join, NoRoute, Target, OtherTarget, OtherClear, Hangar, Clear, Quit);
+        Feed(Spawn, Join, NoRoute, Target, OtherTarget, OtherClear, Hangar, Clear, OtherLeft, Left, Quit);
 
         var messages = _log.Entries.Select(e => e.Message).ToList();
         Assert.All(_log.Entries, e => Assert.Equal(Microsoft.Extensions.Logging.LogLevel.Debug, e.Level));
@@ -249,7 +283,9 @@ public sealed class GameLogProcessorTests : IDisposable
         Assert.Contains("QT target of entity 902412078691 ignored (our ship entity: 903627021939)", messages);
         Assert.Contains("ClearDriver for entity 901556573221 ignored: another vehicle", messages);
         Assert.Contains(messages, m => m.StartsWith("Hangar notification at offset", StringComparison.Ordinal) && m.EndsWith("no pending request from the iPad", StringComparison.Ordinal));
-        Assert.Contains(messages, m => m.StartsWith("Ship context revision 2: NoShip / ClearDriver", StringComparison.Ordinal));
+        Assert.Contains("ClearDriver of our ship (entity 903627021939): input released, ship context kept", messages);
+        Assert.Contains("Left channel of Anvil C8R Pisces Rescue ignored: not the current ship channel", messages);
+        Assert.Contains(messages, m => m.StartsWith("Ship context revision 2: NoShip / ChannelLeft", StringComparison.Ordinal));
         Assert.Contains(messages, m => m.StartsWith("Ship context revision 3: NoShip / GameEnded", StringComparison.Ordinal));
     }
 
@@ -264,10 +300,13 @@ public sealed class GameLogProcessorTests : IDisposable
             Target.Replace("DRAK_Cutter_Rambler", model, StringComparison.Ordinal));
         Assert.Equal("903627021939", State.Ship!.EntityId);
         Assert.Equal("Stanton4a", State.QtTarget.InternalName);
+        PressLights();
         Feed(Clear.Replace("DRAK_Cutter_Rambler", model, StringComparison.Ordinal));
-        Assert.Null(State.Ship);
-        Assert.Equal(ShipContextReason.ClearDriver, State.ShipContext.Reason);
+        Assert.Equal(["0:lv", "0:l^"], _sink.Timeline); // the alias matched our ship: input released
     }
+
+    private void PressLights() =>
+        _executor.Submit(Guid.NewGuid(), new KeyCommand(Guid.NewGuid(), ActionCatalog.All["lights"], KeyPhase.Down, null), _time.GetTimestamp());
 
     private void Feed(params string[] lines)
     {

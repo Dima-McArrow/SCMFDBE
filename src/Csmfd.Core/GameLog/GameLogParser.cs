@@ -9,6 +9,9 @@ public abstract record LogEvent(DateTimeOffset At);
 /// <summary>"You have joined channel '&lt;Brand Ship&gt; : &lt;owner&gt;'" for a recognised manufacturer.</summary>
 public sealed record ShipChannelJoined(DateTimeOffset At, string ShipName, string Owner, string ManufacturerPrefix) : LogEvent(At);
 
+/// <summary>"You have left the channel '&lt;Brand Ship&gt; : &lt;owner&gt;'" for a recognised manufacturer.</summary>
+public sealed record ShipChannelLeft(DateTimeOffset At, string ShipName, string Owner, string ManufacturerPrefix) : LogEvent(At);
+
 public sealed record VehicleSpawning(DateTimeOffset At, string EntityId, string Owner) : LogEvent(At);
 
 /// <summary>A navigation line naming a vehicle model and entity id (used only to bind the current ship).</summary>
@@ -180,8 +183,16 @@ public static partial class GameLogParser
         }
 
         var shipName = match.Groups["name"].Value.Trim();
+        var owner = match.Groups["owner"].Value.Trim();
         var prefix = PrefixForShipName(shipName);
-        return prefix is null ? null : new ShipChannelJoined(at, shipName, match.Groups["owner"].Value.Trim(), prefix);
+        if (prefix is null)
+        {
+            return null;
+        }
+
+        return match.Groups["verb"].Value == "joined"
+            ? new ShipChannelJoined(at, shipName, owner, prefix)
+            : new ShipChannelLeft(at, shipName, owner, prefix);
     }
 
     private static LogEvent? ParseNavigation(string line)
@@ -235,7 +246,8 @@ public static partial class GameLogParser
         return new string(buffer[..length]);
     }
 
-    [GeneratedRegex("""Added notification "You have joined channel '(?<name>[^:]+?) : (?<owner>[^']+)'""", RegexOptions.CultureInvariant, RegexTimeoutMs)]
+    // Verified lines: "You have joined channel 'X : owner'." and "You have left the channel 'X : owner'.".
+    [GeneratedRegex("""Added notification "You have (?<verb>joined|left the) channel '(?<name>[^:]+?) : (?<owner>[^']+)'""", RegexOptions.CultureInvariant, RegexTimeoutMs)]
     private static partial Regex ChannelRegex();
 
     [GeneratedRegex(@"CVehicleMovementBase::ClearDriver: Local client node \[\d+\] releasing control token for '(?<model>[A-Za-z0-9_]+)' \[(?<id>\d+)\]", RegexOptions.CultureInvariant, RegexTimeoutMs)]

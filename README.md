@@ -60,6 +60,26 @@ and visual feedback driven by verified `Game.log` observations. It has no voice 
 Wingman AI here is reading the game log. Thanks to both teams and their communities for advancing companion
 experiences in the 'verse.
 
+## License
+
+**Source-available. Free for noncommercial use.**
+
+Original project code is licensed under [PolyForm Noncommercial 1.0.0](LICENSE).
+You may use, study, modify and share it for the purposes permitted by that license,
+while retaining its terms and the [copyright notice](NOTICE). Copyright remains
+with the respective rights holders.
+
+[Additional permission](ADDITIONAL-PERMISSIONS.md) allows using and showing SCMFD
+in monetized gameplay streams, videos, tutorials and reviews. Commercial sale of
+the app or forks, incorporation into commercial products, and paid services based
+on the software require separate written permission unless already permitted by
+the license. This is a noncommercial source-available project, rather than an
+OSI-defined open-source release.
+
+Third-party components, bundled fonts and game materials retain their own licenses
+and rights; the project license does not replace those terms. For commercial
+licensing requests, contact [Dima-McArrow](https://github.com/Dima-McArrow).
+
 ## Requirements
 
 - Windows 10/11 x64, .NET 10 SDK to build (`global.json` pins 10.0.403, latest feature band allowed).

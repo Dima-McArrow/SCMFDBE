@@ -101,7 +101,7 @@ Every trigger ends in the executor; none of them sends Esc/Enter or any "recover
 | Game window loses focus | `GameMonitor` (WinEvent foreground hook) | `CancelAll` | `focus_lost` |
 | Game process exits or the log shows the session end | `GameMonitor` (2 s / 10 s presence check), `GameLogProcessor` (SystemQuit) | `CancelAll` | `game_ended` |
 | Session locked (Win+L) or detached (user switch, RDP disconnect, logoff) | `Win32/SessionMonitor` (`SystemEvents.SessionSwitch`) | `SetSessionLocked(true/false)` | `session_locked` |
-| ClearDriver, new ship context, log reset | `GameLogProcessor` | `CancelAll` | `ship_context_changed` |
+| Leaving the seat (ClearDriver of our ship), ship channel join / leave, vehicle destroyed, log reset | `GameLogProcessor` | `CancelAll` | `ship_context_changed` |
 | Tray "Pause input" | `TrayContext` | `SetPaused` | `paused` |
 | Disconnect, heartbeat timeout or slow client, client replaced, revoke | `ConnectionSession` / `ControllerRegistry` | `CancelConnection` | `disconnected` / `watchdog` / `client_replaced` / `revoked` |
 | Tap without `up` for 10 s | executor timer | — | `auto_released` (`watchdog`) |
@@ -121,8 +121,13 @@ Every trigger ends in the executor; none of them sends Esc/Enter or any "recover
   `ActionSpec`, never raw strings, so nothing outside `ActionCatalog` can be pressed.
 - The writer is a manual `Utf8JsonWriter` because a delta distinguishes a missing key from `"ship": null`. Its
   invariant checks throw: a throw there is a server bug, not something to catch.
+- **Ship context has one path: `shipContext` in `state`** (owner decision 2026-10-28, spec 41.23). Transitions:
+  `channelJoined`, `channelLeft` (only the current ship's channel), `vehicleDestroyed` (current or just-left ship,
+  verified ejection line), `gameEnded`, `logReset`. ClearDriver is never a transition, it only releases input.
+  Ship channels never go into `activity`. The iPad maps these to Deck on/off, theme and key reset (`FIX-07`);
+  the server sends facts, never UI policy. A new reason is a wire change: fixture + iPad decoder first.
 - `tests/Csmfd.Tests/Fixtures/Protocol/*.json` are the reference messages for both sides. A wire change updates
-  together: spec section 41, the fixture, the writer/parser test, and (in the iPad repo) `CSMFD/Network/ProtocolV2.swift`.
+  together: spec section 41, the fixture, the writer/parser test, and (in the iPad repo) `SCMFD/Network/ProtocolV2.swift`.
 
 ## Changes that span both repositories
 

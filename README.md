@@ -125,16 +125,20 @@ csmfd-probe --host <ip> --fp <hex> --token <token> --stay 120       # idle clien
 |---|---|
 | Protocol v2, WSS/TLS with pinning, pairing, revoke | Implemented and tested; works with the iPad app over the LAN (2026-10-27) |
 | Commands from the iPad | Received, validated and shown in the Input monitor; in-game effect still to be verified |
-| Game.log: ship context, ClearDriver, QT target, ATC | Implemented; checked on real lines and a 117 MiB archive. The iPad does not consume this state yet |
+| Game.log: ship channel join/leave, vehicle destroyed, QT target, ATC | Implemented; checked on real logs (join verified live 2026-10-28, destruction replayed on every real log that has one). Drives the iPad Deck and theme through `shipContext` (iPad `FIX-07`) |
 | Session rewards/contracts activity feed (41.21) | Implemented; bounded 256-event replay, four-event pages, no BE disk ledger. Build/WSS tests and read-only real-log replay checked; in-game coverage/frametime not measured |
-| Ship-channel observations (41.22) | Implemented in source; existing activity replay forwards join/leave facts. FE owns matching and themes. Windows build/tests pending |
+| Ship-channel observations in activity (41.22) | Removed 2026-10-28: ship channels travel only in `state` (spec 41.23) |
 | Tray, network choice, pairing window, input monitor, icon | Working on the gaming PC |
 | In-game measurements (frametime, input latency, 2 h soak) | Not done |
 
 ## Known limits (honest list)
 
-- Channel observations share 256-event retention; there is no BE membership reducer or durable channel snapshot. Update FE and BE together.
-- Ship control is **assumed** from the ship channel join; ClearDriver ends it. No confirmed seat state exists.
+- The ship context follows the **ship channel** (join, leave of the current ship's channel, destruction, game end).
+  Leaving the seat (ClearDriver) only releases held input. The ship is assumed, not a confirmed seat.
+- Destruction is seen only with the player aboard (the log has no line otherwise). Storing the ship at a terminal
+  is not detected yet: no verified line.
+- A remote disconnect from `SC_Default` counts as game end; if the game reconnects to the same session (30k),
+  the ship context stays ended until the next channel join.
 - QT: only `Player Selected Quantum Target - Local` for the bound ship becomes `destination` (internal name,
   `displayName` null). `freeMode` is never emitted: no verified line yet.
 - ATC `answered` means a hangar notification arrived after our request in the same context; there is no

@@ -155,7 +155,8 @@ Csmfd.slnx
 - Замена, укорочение или потеря файла → новое поколение (`log.generation`), сброс контекста и ввода. Уведомление о сбросе приходит **до** первой строки нового поколения.
 
 **`GameLogParser`.** Сначала дешёвая проверка маркера, затем source-generated regex с таймаутом. Распознаётся:
-- вход в корабельный канал (`Added notification "You have joined channel '<Brand Ship> : <owner>'"`, только для известных производителей);
+- вход в корабельный канал и выход из него (`Added notification "You have joined channel '<Brand Ship> : <owner>'"` / `"You have left the channel '…'"`, только для известных производителей);
+- уничтожение корабля с игроком на борту (`<[ActorState] Dead> … ejected from zone '<модель>_<id>' [<id>] … due to previous zone being in a destroyed vehicle`; проверено на 11 реальных строках);
 - спавн (`SetVehicleSpawningInformations`);
 - навигационные строки с моделью и EntityId (`[QuantumTravel]`);
 - выбор цели QT (`Player Selected Quantum Target - Local … selected point X as their destination`);
@@ -172,9 +173,11 @@ Csmfd.slnx
 | Вход в корабельный канал | Новый `contextId`, `revision++`, ship `assumed`, ввод отпускается |
 | Спавн + навигационная строка | Привязка модели и EntityId **без** новой revision (одна кандидатура, тот же владелец, ±10 мин) |
 | Выбор QT для привязанного корабля | `destination`, `confirmed`, `internalName` (displayName пока `null`) |
-| ClearDriver нашего корабля | `ship = null`, `noShip/clearDriver`, `revision++`, `contextId` и префикс производителя сохраняются, ввод отпускается |
-| Повторный ClearDriver после ручного override | Снова `revision++` (по сохранённому EntityId завершённого контекста) |
+| ClearDriver нашего корабля (встал с кресла) | Только отпускание ввода; корабль, revision, QT и ATC не меняются (решение владельца 28.10) |
 | ClearDriver чужого корабля | Игнорируется |
+| Выход из канала **текущего** корабля (то же имя и владелец) | `ship = null`, `noShip/channelLeft`, `revision++`, `contextId` и префикс сохраняются, ввод отпускается; выход из другого канала игнорируется |
+| Уничтожение текущего корабля или корабля, из канала которого только что вышли | `noShip/vehicleDestroyed`, `revision++`, ввод отпускается. В реальных логах выход и уничтожение идут в любом порядке, иногда выхода нет вовсе; повторный выход после уничтожения ничего не меняет |
+| Уничтожение другого корабля (старого, чужого) | Игнорируется |
 | `requestLanding` реально отправлен | ATC `pending` с watermark = текущая длина файла, дедлайн 120 с |
 | `Hangar Request Completed` после watermark в том же контексте | `answered`; более ранние записи не засчитываются |
 | SystemQuit / выход процесса | Один переход `gameEnded` |

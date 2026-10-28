@@ -471,7 +471,6 @@ public static class ServerMessageWriter
     {
         ShipContextReason.Startup => "startup",
         ShipContextReason.ChannelJoined => "channelJoined",
-        ShipContextReason.ClearDriver => "clearDriver",
         ShipContextReason.ChannelLeft => "channelLeft",
         ShipContextReason.GameEnded => "gameEnded",
         ShipContextReason.LogReset => "logReset",

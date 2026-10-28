@@ -26,7 +26,6 @@ public enum ShipContextReason
 {
     Startup,
     ChannelJoined,
-    ClearDriver,
     ChannelLeft,
     GameEnded,
     LogReset,

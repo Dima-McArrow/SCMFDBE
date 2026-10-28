@@ -67,23 +67,6 @@ public sealed class ServerMessageWriterTests
     }
 
     [Fact]
-    public void WritesClearDriverDeltaFixture()
-    {
-        var delta = new StateDelta
-        {
-            Ship = new ShipUpdate(null),
-            ShipContext = new ShipContextState(
-                4, ShipContextStatus.NoShip, ShipContextReason.ClearDriver, ContextId, "DRAK", Midnight.AddMinutes(1)),
-            QtTarget = QtTargetState.Unknown,
-            HangarRequest = HangarRequestState.Idle,
-        };
-
-        Fixture.AssertJsonEqual(
-            Fixture.Read("server-state-delta-clear-driver.json"),
-            ServerMessageWriter.DeltaState(SessionId, 13, delta));
-    }
-
-    [Fact]
     public void WritesVehicleDestroyedDeltaFixture()
     {
         var delta = new StateDelta

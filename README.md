@@ -76,7 +76,7 @@ the window is open, keeps at most 2000 pending entries in memory, never writes t
 | Area | Implementation |
 |---|---|
 | Wire contract (41.6–41.10) | `Csmfd.Protocol`: strict parser (duplicates, depth 8, 16 KiB, UUIDs, allowlist), writer enforcing state invariants, JSON fixtures in `tests/Csmfd.Tests/Fixtures/Protocol` |
-| Transport (41.6, 41.7) | `ConnectionSession`: one receive + one send loop, 1003/1007/1009, hello 5 s, heartbeat 15 s, >100 msg/s → 4005, bounded queues, 2 s send deadline, coalesced state (20 ms, ClearDriver urgent) |
+| Transport (41.6, 41.7) | `ConnectionSession`: one receive + one send loop, 1003/1007/1009, hello 5 s, heartbeat 15 s, >100 msg/s → 4005, bounded queues, 2 s send deadline, coalesced state (20 ms, ship-context transitions urgent) |
 | Pairing & trust (41.5) | `PairingService`, `ServerCertificateStore`, `FileTrustStore`; replacement releases old input before the new client acts; revoke closes 4006 |
 | Input (41.11, 41.12) | `InputExecutor`: one gesture at a time (`busy`), 60 ms tap minimum without blocking, hold deadlines with stale-timer guard, 10 s ceiling, focus/process + physical modifier checks right before input, safety release on focus loss, lock, game exit, ClearDriver, disconnect, pause, shutdown; chat sequence never presses Enter outside the game |
 | Win32 | `SendInput` scan codes / MOUSEINPUT / KEYEVENTF_UNICODE, image-path focus check, WinEvent foreground hook, no keyboard polling |

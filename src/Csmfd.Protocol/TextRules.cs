@@ -1,4 +1,5 @@
 using System.Buffers;
+using System.Globalization;
 using System.Text;
 
 namespace Csmfd.Protocol;
@@ -12,8 +13,9 @@ public static class TextRules
     public const int TokenLength = 43;
 
     /// <summary>
-    /// True when the text is well-formed UTF-16 (no lone surrogates), contains no control
-    /// characters (CR/LF/tab/NUL included) and its length in Unicode scalar values is in range.
+    /// True when the text is well-formed UTF-16 (no lone surrogates), contains no control (Cc, CR/LF/tab/NUL
+    /// included) or format (Cf, e.g. soft hyphen, zero-width space) characters and its length in Unicode
+    /// scalar values is in range. The iPad rejects both categories (spec 41.21).
     /// </summary>
     public static bool IsValidText(string value, int minScalars, int maxScalars)
     {
@@ -28,7 +30,7 @@ public static class TextRules
                 return false;
             }
 
-            if (Rune.IsControl(rune) || ++count > maxScalars)
+            if (IsControlOrFormat(rune) || ++count > maxScalars)
             {
                 return false;
             }
@@ -38,6 +40,10 @@ public static class TextRules
 
         return count >= minScalars;
     }
+
+    /// <summary>Control (Cc) or format (Cf) character: never allowed in wire text.</summary>
+    public static bool IsControlOrFormat(Rune rune) =>
+        Rune.IsControl(rune) || Rune.GetUnicodeCategory(rune) == UnicodeCategory.Format;
 
     public static bool IsTokenFormat(string value)
     {

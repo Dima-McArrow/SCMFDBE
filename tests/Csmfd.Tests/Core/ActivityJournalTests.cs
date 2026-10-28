@@ -72,6 +72,16 @@ public sealed class ActivityJournalTests
         Assert.Equal("Deliver cargo to Lorville", item.Text);
     }
 
+    // The iPad drops a whole activity page with a format character in it (spec 41.21).
+    [Fact]
+    public void ContractTitleLosesFormatCharactersAndKeepsNonAsciiLetters()
+    {
+        _journal.OnLine(new LogLine(Notification("Contract Accepted: Liv­raison à Ori​son: ", mission: Mission), 10, Generation));
+        var item = Assert.Single(_journal.Read(null, 0)!.Events);
+        Assert.Equal("contractAccepted", item.Kind);
+        Assert.Equal("Livraison à Orison", item.Text);
+    }
+
     [Theory]
     [InlineData("Transaction Complete: ")]
     [InlineData("Fine paid: 500 UEC")]

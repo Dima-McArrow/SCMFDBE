@@ -1,5 +1,7 @@
 # Game-session reliability investigation — 2026-10-28
 
+> **Theme and Deck parts superseded by [FIX-07](FIX-07-one-path-deck-and-theme.md) (spec 41.23, 2026-10-28):** the channel-activity theme path described here was removed; ClearDriver no longer turns the Deck off. The command-deadline and input fixes still hold.
+
 ## Evidence and limits
 
 Reviewed the PC diagnostic log in `%LocalAppData%/CSMFD/logs` and the latest LIVE/Game.log

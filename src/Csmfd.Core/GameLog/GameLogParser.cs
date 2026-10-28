@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
+using Csmfd.Protocol;
 
 namespace Csmfd.Core.GameLog;
 
@@ -200,7 +201,8 @@ public static partial class GameLogParser
         var shipName = match.Groups["name"].Value.Trim();
         var owner = match.Groups["owner"].Value.Trim();
         var prefix = PrefixForShipName(shipName);
-        if (prefix is null)
+        // The ship name goes on the wire as is, so a name the writer would refuse is not a recognised channel.
+        if (prefix is null || !TextRules.IsValidText(shipName, 1, ProtocolLimits.MaxNameScalars))
         {
             return null;
         }

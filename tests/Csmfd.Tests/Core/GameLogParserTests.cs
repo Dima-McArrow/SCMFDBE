@@ -77,6 +77,16 @@ public sealed class GameLogParserTests
         Assert.Equal("Drake Vulture Teach's Special", joined.ShipName);
     }
 
+    // The ship name goes on the wire, and the writer refuses control and format characters.
+    [Theory]
+    [InlineData("You have joined channel 'Drake Cutter­Rambler : Test_Pilot'.")]
+    [InlineData("You have left the channel 'RSI Aurora​ Mk I LN : Test_Pilot'.")]
+    [InlineData("You have joined channel 'Drake Cutter\tRambler : Test_Pilot'.")]
+    public void ShipChannelWithAnUnwritableNameIsIgnored(string notification)
+    {
+        Assert.Null(GameLogParser.Parse("<2026-10-27T23:14:15.499Z> [Notice] <SHUDEvent_OnNotification> Added notification \"" + notification));
+    }
+
     [Fact]
     public void ParsesTheVerifiedShipChannelLeaveLine()
     {

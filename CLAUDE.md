@@ -123,7 +123,8 @@ Every trigger ends in the executor; none of them sends Esc/Enter or any "recover
   invariant checks throw: a throw there is a server bug, not something to catch.
 - **Ship context has one path: `shipContext` in `state`** (owner decision 2026-10-28, spec 41.23). Transitions:
   `channelJoined`, `channelLeft` (only the current ship's channel), `vehicleDestroyed` (current or just-left ship,
-  verified ejection line), `gameEnded`, `logReset`. ClearDriver is never a transition, it only releases input.
+  verified ejection line), `gameEnded`, `logReset`. ClearDriver is never a transition, it only releases input;
+  `clearDriver` is no longer a wire reason (the iPad ignores it from older servers).
   Ship channels never go into `activity`. The iPad maps these to Deck on/off, theme and key reset (`FIX-07`);
   the server sends facts, never UI policy. A new reason is a wire change: fixture + iPad decoder first.
 - `tests/Csmfd.Tests/Fixtures/Protocol/*.json` are the reference messages for both sides. A wire change updates

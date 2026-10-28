@@ -233,7 +233,7 @@ public sealed partial class ActivityJournal
 
     private static string Clean(string text, int limit)
     {
-        var runes = text.EnumerateRunes().Where(r => !Rune.IsControl(r)).Take(limit + 1).ToArray();
+        var runes = text.EnumerateRunes().Where(r => !TextRules.IsControlOrFormat(r)).Take(limit + 1).ToArray();
         return runes.Length <= limit
             ? string.Concat(runes.Select(r => r.ToString()))
             : string.Concat(runes.Take(limit - 1).Select(r => r.ToString())) + "…";

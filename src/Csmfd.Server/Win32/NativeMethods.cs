@@ -43,6 +43,15 @@ internal static partial class NativeMethods
     public static partial uint GetWindowThreadProcessId(nint hwnd, out uint processId);
 
     [LibraryImport("user32.dll")]
+    public static partial nint GetKeyboardLayout(uint threadId);
+
+    [LibraryImport("user32.dll", EntryPoint = "VkKeyScanExW")]
+    public static partial short VkKeyScanEx(ushort character, nint layout);
+
+    [LibraryImport("user32.dll", EntryPoint = "MapVirtualKeyExW")]
+    public static partial uint MapVirtualKeyEx(uint code, uint mapType, nint layout);
+
+    [LibraryImport("user32.dll")]
     public static partial short GetAsyncKeyState(int virtualKey);
 
     [LibraryImport("user32.dll")]

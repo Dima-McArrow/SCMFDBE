@@ -16,6 +16,8 @@ internal sealed class FakeInputSink(TimeProvider time) : IInputSink
 
     public bool FailText { get; set; }
 
+    public bool TextReleaseFailed { get; set; }
+
     public int Send(ReadOnlySpan<InputEvent> events)
     {
         var count = Math.Min(events.Length, InsertLimit ?? int.MaxValue);

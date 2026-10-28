@@ -332,11 +332,11 @@ public sealed class InputExecutorTests : IDisposable
         Assert.DoesNotContain(_output.Acks, a => a.Command == chat);
 
         _time.Advance(TimeSpan.FromMilliseconds(60));
-        _time.Advance(TimeSpan.FromMilliseconds(120));
-        _time.Advance(TimeSpan.FromMilliseconds(30));
+        _time.Advance(TimeSpan.FromMilliseconds(300));
+        _time.Advance(TimeSpan.FromMilliseconds(100));
         _time.Advance(TimeSpan.FromMilliseconds(60));
 
-        Assert.Equal(["0:enterv", "60:enter^", "180:text(/dance3)", "210:enterv", "270:enter^"], _sink.Timeline);
+        Assert.Equal(["0:enterv", "60:enter^", "360:text(/dance3)", "460:enterv", "520:enter^"], _sink.Timeline);
         Assert.Equal(AckStatus.Sent, _output.AckFor(chat).Status);
         Assert.False(_executor.HasActiveInput);
     }
@@ -349,12 +349,12 @@ public sealed class InputExecutorTests : IDisposable
         executor.Submit(Connection, new ChatCommand(id, "/wave"), _time.GetTimestamp());
 
         // FakeTimeProvider moves the clock to the end before firing, so chained timers need one step each.
-        foreach (var step in new[] { 60, 120, 30, 60 })
+        foreach (var step in new[] { 60, 300, 100, 60 })
         {
             _time.Advance(TimeSpan.FromMilliseconds(step));
         }
 
-        Assert.Equal(["0:f12v", "60:f12^", "180:text(/wave)", "210:enterv", "270:enter^"], _sink.Timeline);
+        Assert.Equal(["0:f12v", "60:f12^", "360:text(/wave)", "460:enterv", "520:enter^"], _sink.Timeline);
     }
 
     [Fact]
@@ -396,6 +396,34 @@ public sealed class InputExecutorTests : IDisposable
         Assert.Equal(["0:nv", "0:n^"], _sink.Timeline);
         Assert.Equal(CancelReason.Shutdown, Assert.Single(_output.Errors).Reason);
         Assert.Equal(hold, _output.Errors[0].Command);
+    }
+
+    [Fact]
+    public void FailedChatTextNeverSubmitsAnEmptyMessageAndExecutorCanRecover()
+    {
+        var chat = Chat("/wave");
+        _sink.FailText = true;
+        _time.Advance(TimeSpan.FromMilliseconds(60));
+        _time.Advance(TimeSpan.FromMilliseconds(300));
+        _time.Advance(TimeSpan.FromSeconds(1));
+        Assert.Equal((AckStatus.Rejected, RejectReason.InputFailed), _output.AckFor(chat));
+        Assert.Equal(["0:enterv", "60:enter^"], _sink.Timeline);
+        var next = Submit("lights", KeyPhase.Down);
+        Assert.Equal((AckStatus.Sent, (RejectReason?)null), _output.AckFor(next));
+    }
+
+    [Fact]
+    public void FailedChatCleanupBlocksNewInputUntilLocalReset()
+    {
+        Chat("/wave");
+        _sink.FailText = true;
+        _sink.TextReleaseFailed = true;
+        _time.Advance(TimeSpan.FromMilliseconds(60));
+        _time.Advance(TimeSpan.FromMilliseconds(300));
+        Assert.True(_executor.IsBlocked);
+        Assert.Equal(1, _output.BlockedCount);
+        var next = Submit("lights", KeyPhase.Down);
+        Assert.Equal((AckStatus.Rejected, RejectReason.InputFailed), _output.AckFor(next));
     }
 
     private InputExecutor CreateExecutor(InputExecutorOptions options) =>

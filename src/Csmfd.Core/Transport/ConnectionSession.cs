@@ -316,6 +316,7 @@ public sealed partial class ConnectionSession : IControllerConnection, IDisposab
             }
 
             // An invalid token reveals nothing else and gets no state (spec 41.7).
+            LogAuthenticationRejected(_logger, Id);
             SendError(ErrorCode.NotAuthenticated, "Not authenticated");
             RequestClose(CloseCodes.Unauthenticated, "Not authenticated");
             return;
@@ -585,7 +586,7 @@ public sealed partial class ConnectionSession : IControllerConnection, IDisposab
             _socket.Abort();
         }
 
-        LogClosed(_logger, Id, Volatile.Read(ref _closeRequest)?.Code ?? 0);
+        LogClosed(_logger, Id, Volatile.Read(ref _closeRequest)?.Code ?? 0, Volatile.Read(ref _closeRequest)?.Description ?? "Transport ended");
     }
 
     private void CheckDeadlines()
@@ -695,8 +696,8 @@ public sealed partial class ConnectionSession : IControllerConnection, IDisposab
     [LoggerMessage(Level = LogLevel.Information, Message = "Connection {ConnectionId} paired new device {DeviceId}")]
     private static partial void LogPaired(ILogger logger, Guid connectionId, Guid deviceId);
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "Connection {ConnectionId} closed with code {CloseCode}")]
-    private static partial void LogClosed(ILogger logger, Guid connectionId, int closeCode);
+    [LoggerMessage(Level = LogLevel.Information, Message = "Connection {ConnectionId} closed with code {CloseCode}: {Description}")]
+    private static partial void LogClosed(ILogger logger, Guid connectionId, int closeCode, string description);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Connection {ConnectionId} socket error {ErrorCode}")]
     private static partial void LogSocketError(ILogger logger, Guid connectionId, WebSocketError errorCode);
@@ -706,6 +707,9 @@ public sealed partial class ConnectionSession : IControllerConnection, IDisposab
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "Connection {ConnectionId} sent state seq {Seq} (partial: {Partial})")]
     private static partial void LogStateSent(ILogger logger, Guid connectionId, long seq, bool partial);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Connection {ConnectionId} rejected a stored pairing token")]
+    private static partial void LogAuthenticationRejected(ILogger logger, Guid connectionId);
 
     private sealed record CloseRequest(int Code, string Description);
 }

@@ -155,3 +155,8 @@ There is no extra reader/polling loop or PC ledger file. Totals, saved sessions 
 Purchases, sales, rentals, fines and wallet balance are excluded. Starting the server at EOF does not recover
 earlier gameplay. Replay gaps are detectable; the feed is not a durable or complete financial record.
 See section 41.21 in the FE specification and `SESSION-REWARDS-CONTRACTS.md` in the FE root for Mac validation.
+
+## Session reliability follow-up (2026-10-28)
+
+See [SESSION-RELIABILITY-FIXES.md](SESSION-RELIABILITY-FIXES.md) for the observed failures, source fixes,
+verification results and the remaining Mac/game checks.

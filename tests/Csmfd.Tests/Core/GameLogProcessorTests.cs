@@ -253,6 +253,22 @@ public sealed class GameLogProcessorTests : IDisposable
         Assert.Contains(messages, m => m.StartsWith("Ship context revision 3: NoShip / GameEnded", StringComparison.Ordinal));
     }
 
+    [Theory]
+    [InlineData("RSI Aurora Mk I LN", "RSI_Aurora_GS_LN")]
+    [InlineData("Anvil C8R Pisces Rescue", "ANVL_C8R_Pisces")]
+    public void VerifiedDisplayAliasesBindQuantumTargetAndClearDriver(string name, string model)
+    {
+        Feed(Spawn,
+            Join.Replace("Drake Cutter Rambler", name, StringComparison.Ordinal),
+            NoRoute.Replace("DRAK_Cutter_Rambler", model, StringComparison.Ordinal),
+            Target.Replace("DRAK_Cutter_Rambler", model, StringComparison.Ordinal));
+        Assert.Equal("903627021939", State.Ship!.EntityId);
+        Assert.Equal("Stanton4a", State.QtTarget.InternalName);
+        Feed(Clear.Replace("DRAK_Cutter_Rambler", model, StringComparison.Ordinal));
+        Assert.Null(State.Ship);
+        Assert.Equal(ShipContextReason.ClearDriver, State.ShipContext.Reason);
+    }
+
     private void Feed(params string[] lines)
     {
         foreach (var line in lines)

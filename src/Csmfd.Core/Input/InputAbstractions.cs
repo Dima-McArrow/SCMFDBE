@@ -14,8 +14,11 @@ public interface IInputSink
     /// <summary>Sends events in one batch and returns how many were actually inserted.</summary>
     int Send(ReadOnlySpan<InputEvent> events);
 
-    /// <summary>Types text as Unicode key events; false if not every event was inserted.</summary>
+    /// <summary>Types allowlisted chat text using the foreground keyboard layout; false on unsupported text or partial insertion.</summary>
     bool SendText(string text);
+
+    /// <summary>A partial text insertion could not release its keys. Requires the same local reset as a failed key release.</summary>
+    bool TextReleaseFailed => false;
 }
 
 public enum GameFocus

@@ -53,6 +53,10 @@ public sealed class GameLogParserTests
     }
 
     [Theory]
+    [InlineData("RSI Aurora Mk I LN", "RSI_Aurora_GS_LN", true)]
+    [InlineData("RSI Aurora Mk I LN", "RSI_Aurora_ES", false)]
+    [InlineData("Anvil C8R Pisces Rescue", "ANVL_C8R_Pisces", true)]
+    [InlineData("Anvil C8R Pisces Rescue", "ANVL_C8_Pisces", false)]
     [InlineData("Drake Cutter Rambler", "DRAK_Cutter_Rambler", true)]
     [InlineData("Mirai Guardian MX", "MRAI_Guardian_MX_Collector_Military", true)]
     [InlineData("RSI Constellation Mk5 Centaurus", "RSI_Constellation_Mk5_Centaurus", true)]
@@ -61,6 +65,14 @@ public sealed class GameLogParserTests
     public void MatchesShipNameToModel(string shipName, string model, bool expected)
     {
         Assert.Equal(expected, GameLogParser.ShipNameMatchesModel(shipName, model));
+    }
+
+    [Fact]
+    public void ShipChannelNameCanContainAnApostrophe()
+    {
+        var parsed = GameLogParser.Parse("<2026-10-27T23:14:15.499Z> [Notice] <SHUDEvent_OnNotification> Added notification \"You have joined channel 'Drake Vulture Teach's Special : Test_Pilot'.");
+        var joined = Assert.IsType<ShipChannelJoined>(parsed);
+        Assert.Equal("Drake Vulture Teach's Special", joined.ShipName);
     }
 
     private static DateTimeOffset At(string time) =>

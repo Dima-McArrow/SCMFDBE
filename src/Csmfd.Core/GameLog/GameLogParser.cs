@@ -97,7 +97,13 @@ public static partial class GameLogParser
         ArgumentNullException.ThrowIfNull(shipName);
         ArgumentNullException.ThrowIfNull(model);
 
-        var name = shipName;
+        // Verified display/model aliases; do not guess by a shared manufacturer or hull word.
+        var name = shipName switch
+        {
+            "RSI Aurora Mk I LN" => "RSI Aurora GS LN",
+            "Anvil C8R Pisces Rescue" => "Anvil C8R Pisces",
+            _ => shipName,
+        };
         foreach (var (brand, prefix) in Brands)
         {
             if (name.StartsWith(brand, StringComparison.OrdinalIgnoreCase))
@@ -229,7 +235,7 @@ public static partial class GameLogParser
         return new string(buffer[..length]);
     }
 
-    [GeneratedRegex("""Added notification "You have joined channel '(?<name>[^':]+?) : (?<owner>[^']+)'""", RegexOptions.CultureInvariant, RegexTimeoutMs)]
+    [GeneratedRegex("""Added notification "You have joined channel '(?<name>[^:]+?) : (?<owner>[^']+)'""", RegexOptions.CultureInvariant, RegexTimeoutMs)]
     private static partial Regex ChannelRegex();
 
     [GeneratedRegex(@"CVehicleMovementBase::ClearDriver: Local client node \[\d+\] releasing control token for '(?<model>[A-Za-z0-9_]+)' \[(?<id>\d+)\]", RegexOptions.CultureInvariant, RegexTimeoutMs)]

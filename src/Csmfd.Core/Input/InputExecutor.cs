@@ -13,9 +13,9 @@ public sealed record InputExecutorOptions
     /// <summary>A command older than this when execution starts is rejected as expired (spec 41.6).</summary>
     public TimeSpan MaxCommandAge { get; init; } = TimeSpan.FromMilliseconds(250);
 
-    public TimeSpan ChatOpenDelay { get; init; } = TimeSpan.FromMilliseconds(120);
+    public TimeSpan ChatOpenDelay { get; init; } = TimeSpan.FromMilliseconds(300);
 
-    public TimeSpan ChatSubmitDelay { get; init; } = TimeSpan.FromMilliseconds(30);
+    public TimeSpan ChatSubmitDelay { get; init; } = TimeSpan.FromMilliseconds(100);
 
     public ChatKey ChatKey { get; init; } = ChatKey.Enter;
 }
@@ -447,6 +447,7 @@ public sealed class InputExecutor : IDisposable
 
                 if (!_sink.SendText(gesture.ChatText!))
                 {
+                    if (_sink.TextReleaseFailed) { Block(); }
                     AbortChat(gesture, RejectReason.InputFailed);
                     return;
                 }

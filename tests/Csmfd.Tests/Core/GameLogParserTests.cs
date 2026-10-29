@@ -47,6 +47,9 @@ public sealed class GameLogParserTests
     [InlineData("Consolidated Outland Pioneer", "CNOU")]
     [InlineData("MISC Prospector", "MISC")]
     [InlineData("Mirai Guardian MX", "MRAI")]
+    [InlineData("Corsair PYAM Exec", "DRAK")]
+    [InlineData("Corsair", null)]
+    [InlineData("Corsair PYAM Exec Social", null)]
     [InlineData("Drakeville", null)]
     [InlineData("General", null)]
     public void MapsChannelBrandToManufacturerPrefix(string shipName, string? prefix)
@@ -60,6 +63,10 @@ public sealed class GameLogParserTests
     [InlineData("Anvil C8R Pisces Rescue", "ANVL_C8R_Pisces", true)]
     [InlineData("Anvil C8R Pisces Rescue", "ANVL_C8_Pisces", false)]
     [InlineData("Drake Cutter Rambler", "DRAK_Cutter_Rambler", true)]
+    [InlineData("Corsair PYAM Exec", "DRAK_Corsair_Exec_StealthIndustrial", true)]
+    [InlineData("Corsair PYAM Exec", "DRAK_Corsair", false)]
+    [InlineData("Corsair PYAM Exec", "DRAK_Corsair_Exec_Combat", false)]
+    [InlineData("Corsair PYAM Exec", "DRAK_Cutlass_Red", false)]
     [InlineData("Mirai Guardian MX", "MRAI_Guardian_MX_Collector_Military", true)]
     [InlineData("RSI Constellation Mk5 Centaurus", "RSI_Constellation_Mk5_Centaurus", true)]
     [InlineData("Drake Cutter Rambler", "DRAK_Cutter", false)]
@@ -67,6 +74,27 @@ public sealed class GameLogParserTests
     public void MatchesShipNameToModel(string shipName, string model, bool expected)
     {
         Assert.Equal(expected, GameLogParser.ShipNameMatchesModel(shipName, model));
+    }
+
+    // Anonymized first lines of the real multiline join/leave notifications on 2026-10-29.
+    [Theory]
+    [InlineData("joined", true)]
+    [InlineData("left the", false)]
+    public void RecognizesTheVerifiedCorsairChannelOnJoinAndLeave(string verb, bool joined)
+    {
+        var parsed = GameLogParser.Parse($"<2026-10-29T04:33:50.742Z> [Notice] <SHUDEvent_OnNotification> Added notification \"You have {verb} channel 'Corsair PYAM Exec : Test_Pilot'.");
+        if (joined)
+        {
+            var item = Assert.IsType<ShipChannelJoined>(parsed);
+            Assert.Equal("Corsair PYAM Exec", item.ShipName);
+            Assert.Equal("DRAK", item.ManufacturerPrefix);
+        }
+        else
+        {
+            var item = Assert.IsType<ShipChannelLeft>(parsed);
+            Assert.Equal("Corsair PYAM Exec", item.ShipName);
+            Assert.Equal("DRAK", item.ManufacturerPrefix);
+        }
     }
 
     [Fact]
@@ -106,6 +134,30 @@ public sealed class GameLogParserTests
         var destroyed = Assert.IsType<VehicleDestroyed>(parsed);
         Assert.Equal("RSI_Aurora_GS_LN", destroyed.Model);
         Assert.Equal("872969214881", destroyed.EntityId);
+    }
+
+    [Theory]
+    [InlineData("SC_Default", 0, "DisconnectCmd: disconnect light ExitToMenu", true)]
+    [InlineData("SC_Default", 1, "Remote Disconnect - Player requested disconnect", true)]
+    [InlineData("SC_Frontend", 0, "DisconnectCmd: disconnect light ExitToMenu", false)]
+    [InlineData("SC_Frontend", 1, "Remote Disconnect - Player requested disconnect", false)]
+    [InlineData("SC_Default", 0, "Nub destroyed", false)]
+    [InlineData("SC_Default", 0, "DisconnectCmd: disconnect light ExitToMenuExtra", false)]
+    [InlineData("SC_Default", 0, "ExitToMenu", false)]
+    public void OnlyVerifiedUniverseDisconnectsEndTheShipContext(string rules, int remote, string reason, bool expected)
+    {
+        // Real local ExitToMenu shape, with network addresses and player identity omitted.
+        var line = $"<2026-10-29T03:31:14.289Z> [Notice] <Channel Disconnected> cause=30016 reason=\"{reason}\" frame=483103 isRemote={remote} viewState=eCVS_InGame map=\"megamap\" gamerules=\"{rules}\" hostType=\"Replicant\" [Team_Network][Network][Gateway][Disconnection]";
+        var parsed = GameLogParser.Parse(line);
+        if (expected)
+        {
+            var ended = Assert.IsType<GameSessionEnded>(parsed);
+            Assert.Equal(DateTimeOffset.Parse("2026-10-29T03:31:14.289Z", System.Globalization.CultureInfo.InvariantCulture), ended.At);
+        }
+        else
+        {
+            Assert.Null(parsed);
+        }
     }
 
     private static DateTimeOffset At(string time) =>

@@ -286,6 +286,44 @@ public sealed class GameLogProcessorTests : IDisposable
         Assert.Equal(HangarRequestState.Idle, State.HangarRequest);
     }
 
+    private const string LocalMenuExit = "<2026-10-29T03:31:14.289Z> [Notice] <Channel Disconnected> cause=30016 reason=\"DisconnectCmd: disconnect light ExitToMenu\" frame=483103 isRemote=0 viewState=eCVS_InGame map=\"megamap\" gamerules=\"SC_Default\" hostType=\"Replicant\" [Team_Network][Network][Gateway][Disconnection]";
+
+    [Fact]
+    public void LocalMenuExitClearsShipReadoutsAndReleasesInputOnlyOnce()
+    {
+        Feed(Spawn, Join, NoRoute, Target);
+        PressLights();
+        Feed(LocalMenuExit);
+
+        Assert.Null(State.Ship);
+        Assert.Equal(2, State.ShipContext.Revision);
+        Assert.Equal(ShipContextStatus.NoShip, State.ShipContext.Status);
+        Assert.Equal(ShipContextReason.GameEnded, State.ShipContext.Reason);
+        Assert.Equal(QtTargetState.Unknown, State.QtTarget);
+        Assert.Equal(HangarRequestState.Idle, State.HangarRequest);
+        Assert.Equal(["0:lv", "0:l^"], _sink.Timeline);
+
+        Feed(LocalMenuExit, Quit);
+        _processor.OnGameProcessExited();
+        Assert.Equal(2, State.ShipContext.Revision);
+    }
+
+    [Fact]
+    public void LocalMenuExitKeepsTheActivityCaptureOpen()
+    {
+        var journal = new ActivityJournal(_time, _generation);
+        using var processor = new GameLogProcessor(_store, _executor, _time, _generation, () => 0, activity: journal);
+        processor.OnLine(new LogLine(ActivityJournalTests.Notification("You have created party: ", 1), 10, _generation));
+        processor.OnLine(new LogLine(LocalMenuExit, 1000, _generation));
+        processor.OnLine(new LogLine(ActivityJournalTests.Notification("New Member Joined Pilot_Two has joined the party.: ", 2), 2000, _generation));
+
+        var page = journal.Read(null, 0)!;
+        Assert.False(page.Ended);
+        Assert.Collection(page.Events,
+            item => Assert.Equal("partyCreated", item.Kind),
+            item => Assert.Equal("partyMemberJoined", item.Kind));
+    }
+
     [Fact]
     public void QuitAndProcessExitAreOneGameEndedTransition()
     {
@@ -356,6 +394,7 @@ public sealed class GameLogProcessorTests : IDisposable
     [Theory]
     [InlineData("RSI Aurora Mk I LN", "RSI_Aurora_GS_LN")]
     [InlineData("Anvil C8R Pisces Rescue", "ANVL_C8R_Pisces")]
+    [InlineData("Corsair PYAM Exec", "DRAK_Corsair_Exec_StealthIndustrial")]
     public void VerifiedDisplayAliasesBindQuantumTargetAndClearDriver(string name, string model)
     {
         Feed(Spawn,
@@ -367,6 +406,11 @@ public sealed class GameLogProcessorTests : IDisposable
         PressLights();
         Feed(Clear.Replace("DRAK_Cutter_Rambler", model, StringComparison.Ordinal));
         Assert.Equal(["0:lv", "0:l^"], _sink.Timeline); // the alias matched our ship: input released
+
+        Feed(Left.Replace("Drake Cutter Rambler", name, StringComparison.Ordinal));
+        Assert.Null(State.Ship);
+        Assert.Equal(ShipContextReason.ChannelLeft, State.ShipContext.Reason);
+        Assert.Equal(QtTargetState.Unknown, State.QtTarget);
     }
 
     private void PressLights() =>

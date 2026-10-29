@@ -200,14 +200,23 @@ csmfd-probe --host <ip> --fp <hex> --token <token> --stay 120       # idle clien
 | Tray, network choice, pairing window, input monitor, icon | Working on the gaming PC |
 | In-game measurements (frametime, input latency, 2 h soak) | Not done |
 
+## Verified ship-name alias (2026-10-29)
+
+The exact observed channel name `Corsair PYAM Exec` maps to Drake (`DRAK`) and the verified model
+`DRAK_Corsair_Exec_StealthIndustrial`. Join/leave and existing entity binding now recognize this variant;
+arbitrary channels beginning with Corsair are not accepted. No protocol change, new reader, polling or FE
+calculation is introduced. This does not change menu-reentry recovery or QT binding for other ships.
+
 ## Known limits (honest list)
 
 - The ship context follows the **ship channel** (join, leave of the current ship's channel, destruction, game end).
   Leaving the seat (ClearDriver) only releases held input. The ship is assumed, not a confirmed seat.
 - Destruction is seen only with the player aboard (the log has no line otherwise). Storing the ship at a terminal
   is not detected yet: no verified line.
-- A remote disconnect from `SC_Default` counts as game end; if the game reconnects to the same session (30k),
-  the ship context stays ended until the next channel join.
+- A remote disconnect from `SC_Default`, or the verified local `DisconnectCmd: disconnect light ExitToMenu`
+  with `isRemote=0`, ends the ship context. Frontend channels and other local disconnect reasons are ignored.
+  Returning to PU does not itself restore the ship context: it stays ended until the next recognized ship-channel
+  join. Menu exit does not end the Party/reward activity capture; SystemQuit/process exit still does.
 - A ship channel whose ship name contains a control (Cc) or format (Cf) character, or is longer than the name
   limit (128 scalars), is ignored (`GameLogParser`): the iPad Deck does not turn on and the theme does not change.
 - QT: only `Player Selected Quantum Target - Local` for the bound ship becomes `destination` (internal name,

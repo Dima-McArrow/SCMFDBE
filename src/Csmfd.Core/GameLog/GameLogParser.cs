@@ -31,7 +31,7 @@ public sealed record HangarRequestCompleted(DateTimeOffset At) : LogEvent(At);
 /// </summary>
 public sealed record VehicleDestroyed(DateTimeOffset At, string Model, string EntityId) : LogEvent(At);
 
-/// <summary>Client quit or left the universe (SystemQuit / remote disconnect from SC_Default).</summary>
+/// <summary>Client quit or left the universe (SystemQuit / remote PU disconnect / verified local ExitToMenu).</summary>
 public sealed record GameSessionEnded(DateTimeOffset At) : LogEvent(At);
 
 /// <summary>
@@ -89,6 +89,12 @@ public static partial class GameLogParser
     public static string? PrefixForShipName(string shipName)
     {
         ArgumentNullException.ThrowIfNull(shipName);
+        // Verified 2026-10-29 channel name omits Drake; do not treat arbitrary Corsair channels as ships.
+        if (string.Equals(shipName, "Corsair PYAM Exec", StringComparison.Ordinal))
+        {
+            return "DRAK";
+        }
+
         foreach (var (brand, prefix) in Brands)
         {
             if (shipName.StartsWith(brand, StringComparison.OrdinalIgnoreCase)
@@ -112,6 +118,7 @@ public static partial class GameLogParser
         {
             "RSI Aurora Mk I LN" => "RSI Aurora GS LN",
             "Anvil C8R Pisces Rescue" => "Anvil C8R Pisces",
+            "Corsair PYAM Exec" => "DRAK_Corsair_Exec_StealthIndustrial",
             _ => shipName,
         };
         foreach (var (brand, prefix) in Brands)
@@ -170,9 +177,13 @@ public static partial class GameLogParser
             return TryTime(line, out var at) ? new GameSessionEnded(at) : null;
         }
 
+        // The 2026-10-29 log also records local ExitToMenu with isRemote=0. Other local
+        // disconnect reasons and frontend channels are not verified universe exits.
         if (line.Contains("<Channel Disconnected>", StringComparison.Ordinal)
-            && line.Contains("isRemote=1", StringComparison.Ordinal)
-            && line.Contains("gamerules=\"SC_Default\"", StringComparison.Ordinal))
+            && line.Contains("gamerules=\"SC_Default\"", StringComparison.Ordinal)
+            && (line.Contains("isRemote=1", StringComparison.Ordinal)
+                || (line.Contains("isRemote=0 ", StringComparison.Ordinal)
+                    && line.Contains("reason=\"DisconnectCmd: disconnect light ExitToMenu\"", StringComparison.Ordinal))))
         {
             return TryTime(line, out var at) ? new GameSessionEnded(at) : null;
         }

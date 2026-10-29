@@ -75,13 +75,82 @@ public sealed class GameLogProcessorTests : IDisposable
     }
 
     [Fact]
-    public void QuantumTargetOfOurShipIsConfirmedAndOthersAreIgnored()
+    public void LatestLocalQuantumSelectionWinsRegardlessOfTheBoundShip()
     {
         Feed(Spawn, Join, NoRoute, OtherTarget);
-        Assert.Equal(QtMode.Unknown, State.QtTarget.Mode);
+        Assert.Equal("rs_ext_pyro6_leo", State.QtTarget.InternalName);
+        Assert.Equal("903627021939", State.Ship!.EntityId);
+        Assert.Equal(1, State.ShipContext.Revision);
 
         Feed(Target);
         Assert.Equal(new QtTargetState(QtMode.Destination, "Stanton4a", null, Confidence.Confirmed, State.QtTarget.ObservedAt), State.QtTarget);
+    }
+
+    [Fact]
+    public void LocalQuantumSelectionNeedsNeitherChannelNorSpawnAndPublishesOnlyQt()
+    {
+        _store.TakeFull();
+        Feed(Target);
+        Assert.Null(State.Ship);
+        Assert.Equal(ShipContextStatus.Unknown, State.ShipContext.Status);
+        Assert.Equal(0, State.ShipContext.Revision);
+        Assert.Equal("Stanton4a", State.QtTarget.InternalName);
+        Assert.Equal(Confidence.Confirmed, State.QtTarget.Confidence);
+        Assert.NotNull(State.QtTarget.ObservedAt);
+        var delta = _store.TakeDelta()!.Value.Delta;
+        Assert.NotNull(delta.QtTarget);
+        Assert.Null(delta.Ship);
+        Assert.Null(delta.ShipContext);
+        Assert.Empty(_sink.Timeline);
+    }
+
+    [Fact]
+    public void UnboundShipDoesNotBlockLocalQuantumSelection()
+    {
+        Feed(Join, Target);
+        Assert.Null(State.Ship!.EntityId);
+        Assert.Equal("Stanton4a", State.QtTarget.InternalName);
+        Assert.Equal(1, State.ShipContext.Revision);
+    }
+
+    [Fact]
+    public void ShipChangesPreserveTheLastLocalSelectionUntilAnActualSessionOrLogReset()
+    {
+        Feed(Target);
+        var selected = State.QtTarget;
+        Feed(Join, Left, Join, Destroyed);
+        Assert.Equal(selected, State.QtTarget);
+        Feed(Quit);
+        Assert.Equal(QtTargetState.Unknown, State.QtTarget);
+        Feed(Target);
+        _processor.OnGenerationReset(Guid.NewGuid());
+        Assert.Equal(QtTargetState.Unknown, State.QtTarget);
+    }
+
+    [Fact]
+    public void SelectionAfterMenuReentryDoesNotNeedAJoinAndIsClearedOnTheNextExit()
+    {
+        Feed(Join, LocalMenuExit);
+        var revision = State.ShipContext.Revision;
+        Feed(Target);
+        Assert.Equal("Stanton4a", State.QtTarget.InternalName);
+        Assert.Null(State.Ship);
+        Assert.Equal(revision, State.ShipContext.Revision);
+        Feed(LocalMenuExit);
+        Assert.Equal(QtTargetState.Unknown, State.QtTarget);
+        Assert.Equal(revision, State.ShipContext.Revision);
+        Feed(Target);
+        _processor.OnGameProcessExited();
+        Assert.Equal(QtTargetState.Unknown, State.QtTarget);
+    }
+
+    [Theory]
+    [InlineData("Player Selected Quantum Target - Remote")]
+    [InlineData("Player Selected Quantum Target")]
+    public void NavigationWithoutTheExplicitLocalSelectionMarkerDoesNotSetQt(string marker)
+    {
+        Feed(Target.Replace("Player Selected Quantum Target - Local", marker, StringComparison.Ordinal));
+        Assert.Equal(QtTargetState.Unknown, State.QtTarget);
     }
 
     [Fact]
@@ -129,7 +198,7 @@ public sealed class GameLogProcessorTests : IDisposable
         Assert.Equal(ShipContextReason.ChannelLeft, State.ShipContext.Reason);
         Assert.Equal(contextId, State.ShipContext.ContextId);
         Assert.Equal("DRAK", State.ShipContext.ManufacturerPrefix);
-        Assert.Equal(QtTargetState.Unknown, State.QtTarget);
+        Assert.Equal("Stanton4a", State.QtTarget.InternalName);
         Assert.Equal(["0:lv", "0:l^"], _sink.Timeline);
     }
 
@@ -167,7 +236,7 @@ public sealed class GameLogProcessorTests : IDisposable
         Assert.Equal(2, State.ShipContext.Revision);
         Assert.Equal(ShipContextStatus.NoShip, State.ShipContext.Status);
         Assert.Equal(ShipContextReason.VehicleDestroyed, State.ShipContext.Reason);
-        Assert.Equal(QtTargetState.Unknown, State.QtTarget);
+        Assert.Equal("Stanton4a", State.QtTarget.InternalName);
         Assert.Equal(["0:lv", "0:l^"], _sink.Timeline);
     }
 
@@ -382,7 +451,7 @@ public sealed class GameLogProcessorTests : IDisposable
         Assert.Contains("Ship context revision 1: Assumed / ChannelJoined, ship Drake Cutter Rambler, prefix DRAK", messages);
         Assert.Contains(messages, m => m.StartsWith("Ship bound to model", StringComparison.Ordinal) && m.EndsWith("entity 903627021939", StringComparison.Ordinal));
         Assert.Contains("QT destination Stanton4a accepted for entity 903627021939", messages);
-        Assert.Contains("QT target of entity 902412078691 ignored (our ship entity: 903627021939)", messages);
+        Assert.Contains("QT destination rs_ext_pyro6_leo accepted for entity 902412078691", messages);
         Assert.Contains("ClearDriver for entity 901556573221 ignored: another vehicle", messages);
         Assert.Contains(messages, m => m.StartsWith("Hangar notification at offset", StringComparison.Ordinal) && m.EndsWith("no pending request from the iPad", StringComparison.Ordinal));
         Assert.Contains("ClearDriver of our ship (entity 903627021939): input released, ship context kept", messages);
@@ -410,7 +479,7 @@ public sealed class GameLogProcessorTests : IDisposable
         Feed(Left.Replace("Drake Cutter Rambler", name, StringComparison.Ordinal));
         Assert.Null(State.Ship);
         Assert.Equal(ShipContextReason.ChannelLeft, State.ShipContext.Reason);
-        Assert.Equal(QtTargetState.Unknown, State.QtTarget);
+        Assert.Equal("Stanton4a", State.QtTarget.InternalName);
     }
 
     private void PressLights() =>

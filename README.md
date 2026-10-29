@@ -121,7 +121,7 @@ Re-enable input (only after a failed release) · Input monitor · Debug logging 
 Copy firewall command · Open data folder · Quit.
 
 **Debug logging**: for 15 minutes the log file also explains Game.log decisions (recognized event and offset, ship
-context revisions, ship ↔ entity binding, ignored ClearDriver / QT / hangar notifications and why, ATC pending /
+context revisions, ship ↔ entity binding, local QT selections, ignored ClearDriver / hangar notifications and why, ATC pending /
 answered / timeout) and every state sent to the iPad (seq, full or delta). Same privacy rules as the normal log: no
 player handle, raw log lines, chat text, tokens or codes. Always off after a restart.
 
@@ -219,8 +219,12 @@ calculation is introduced. This does not change menu-reentry recovery or QT bind
   join. Menu exit does not end the Party/reward activity capture; SystemQuit/process exit still does.
 - A ship channel whose ship name contains a control (Cc) or format (Cf) character, or is longer than the name
   limit (128 scalars), is ignored (`GameLogParser`): the iPad Deck does not turn on and the theme does not change.
-- QT: only `Player Selected Quantum Target - Local` for the bound ship becomes `destination` (internal name,
-  `displayName` null). `freeMode` is never emitted: no verified line yet.
+- QT: `Player Selected Quantum Target - Local` becomes the last observed local `destination`, independently
+  of ship-channel state, entity binding or spawn (owner decision, 2026-10-29). Ship join/leave, ClearDriver and
+  destruction preserve it; PU exit, process/SystemQuit and log reset clear it. This confirms a selection, not
+  a currently locked target or completed jump. Names remain technical (`displayName` null); `freeMode` and
+  target-cleared events are not emitted because no verified source was established. Missing selection records
+  cannot be reconstructed. QT alone does not enable the Deck or identify a ship.
 - ATC `answered` means a hangar notification arrived after our request in the same context; there is no
   request id in the log, so a late answer to an earlier request can still be attributed to the newer one.
 - Foreground check and `SendInput` are not atomic; focus can change in between (spec 41.4).
@@ -262,3 +266,12 @@ passed. A read-only replay of 37 real logs (2,621,104 lines) produced 43 Party f
 source scan: 1 creation, 6 local joins, 7 member joins, 16 member leaves, 10 leader changes and 3 disbands.
 Swift tests are added but cannot run on this Windows machine. Before in-game testing, build/test the iPad
 app on Mac and use the matching updated BE build. Check the Party tab in portrait/landscape and en/fr/ru.
+
+## Local QT observation (owner decision, 2026-10-29)
+
+The selected local QT destination is independent of ship identity. The existing single reader publishes
+it even without a spawn, a recognized channel or a bound entity. No new reader, polling, timer, history or
+input action is added. The wire shape stays unchanged. See `QT-LOCAL-TARGET-BE-HANDOFF.md` in the root of
+the companion SCMFD repository for FE validation and the semantic update required in the shared spec.
+FE source and the existing shared spec were not edited in this BE-only step. This owner decision supersedes
+the earlier bound-ship gate and unconditional ship-transition QT resets.

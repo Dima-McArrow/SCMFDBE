@@ -237,7 +237,9 @@ public static partial class GameLogParser
         if (line.Contains("<Player Selected Quantum Target - Local>", StringComparison.Ordinal))
         {
             var target = QuantumTargetRegex().Match(line);
-            return target.Success ? new QuantumTargetSelected(at, model, entityId, target.Groups["target"].Value) : null;
+            // A selected target goes directly on the wire, including without a known ship.
+            return target.Success && TextRules.IsValidText(target.Groups["target"].Value, 1, ProtocolLimits.MaxNameScalars)
+                ? new QuantumTargetSelected(at, model, entityId, target.Groups["target"].Value) : null;
         }
 
         return new VehicleObserved(at, model, entityId);

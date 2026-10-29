@@ -8,7 +8,7 @@ namespace Csmfd.Core.GameLog;
 
 /// <summary>
 /// Turns verified log events into published state (spec 41.8, 41.9, 41.13, 41.14):
-/// ship context lifecycle, QT target of the current ship and the ATC request indicator.
+/// ship context lifecycle, last observed local QT selection and the ATC request indicator.
 /// Lock order: this class never calls the executor while holding its own lock, because the
 /// executor calls <see cref="OnInputStarted"/> while holding its lock.
 /// Debug messages explain each decision (event type, offset, revision, entity ids, ignore reasons) but
@@ -208,16 +208,11 @@ public sealed partial class GameLogProcessor : IDisposable
             case QuantumTargetSelected target:
                 Remember(_observations, _observationOrder, target.EntityId, new VehicleObserved(target.At, target.Model, target.EntityId));
                 EnrichIfBound();
-                if (_active?.EntityId is { } entityId && string.Equals(entityId, target.EntityId, StringComparison.Ordinal))
-                {
-                    _qt = new QtTargetState(QtMode.Destination, target.Target, DisplayName: null, Confidence.Confirmed, target.At);
-                    LogQtAccepted(_logger, target.Target, target.EntityId);
-                    Publish(urgent: false);
-                }
-                else
-                {
-                    LogQtIgnored(_logger, target.EntityId, _active?.EntityId ?? "unknown");
-                }
+                // The source explicitly says Player Selected Quantum Target - Local. Selection is
+                // observed even when the ship channel, spawn or entity binding is unavailable.
+                _qt = new QtTargetState(QtMode.Destination, target.Target, DisplayName: null, Confidence.Confirmed, target.At);
+                LogQtAccepted(_logger, target.Target, target.EntityId);
+                Publish(urgent: false);
 
                 return false;
 
@@ -352,7 +347,15 @@ public sealed partial class GameLogProcessor : IDisposable
     {
         if (_active is null && _status == ShipContextStatus.NoShip && _lastReason == ShipContextReason.GameEnded)
         {
-            return false; // SystemQuit followed by process exit: one transition only.
+            // A local selection may have arrived after re-entering PU without a new ship channel.
+            // Clear it on the next exit even though the ship context is already marked ended.
+            if (_qt != QtTargetState.Unknown)
+            {
+                _qt = QtTargetState.Unknown;
+                Publish(urgent: true);
+            }
+
+            return false; // SystemQuit followed by process exit: one ship transition only.
         }
 
         _active = null;
@@ -361,14 +364,17 @@ public sealed partial class GameLogProcessor : IDisposable
         return true;
     }
 
-    /// <summary>A real context transition: new revision, QT and ATC cleared, published urgently.</summary>
+    /// <summary>A ship transition clears ATC; local QT selection survives ship changes, but not capture/session end.</summary>
     private void Transition(ShipContextStatus status, ShipContextReason reason, DateTimeOffset at)
     {
         _revision++;
         _status = status;
         _lastReason = reason;
         _contextObservedAt = at;
-        _qt = QtTargetState.Unknown;
+        if (reason is ShipContextReason.GameEnded or ShipContextReason.LogReset)
+        {
+            _qt = QtTargetState.Unknown;
+        }
         _hangar?.Timer.Dispose();
         _hangar = null;
         _hangarState = HangarRequestState.Idle;
@@ -486,9 +492,6 @@ public sealed partial class GameLogProcessor : IDisposable
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "QT destination {Target} accepted for entity {EntityId}")]
     private static partial void LogQtAccepted(ILogger logger, string target, string entityId);
-
-    [LoggerMessage(Level = LogLevel.Debug, Message = "QT target of entity {EntityId} ignored (our ship entity: {Bound})")]
-    private static partial void LogQtIgnored(ILogger logger, string entityId, string bound);
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "ATC pending for command {CommandId}, watermark {Watermark}")]
     private static partial void LogAtcPending(ILogger logger, Guid commandId, long watermark);

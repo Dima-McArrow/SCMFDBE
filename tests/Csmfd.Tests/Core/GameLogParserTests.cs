@@ -160,6 +160,14 @@ public sealed class GameLogParserTests
         }
     }
 
+    [Fact]
+    public void OverlongLocalQuantumTargetIsIgnoredBeforeItCanReachTheWireWriter()
+    {
+        var line = "<2026-10-29T04:51:46.090Z> [Notice] <Player Selected Quantum Target - Local> [ItemNavigation][CL][10284] | NOT AUTH | DRAK_Corsair_Exec_StealthIndustrial_906850967790[906850967790]|CSCItemNavigation::OnPlayerSelectedQuantumTarget|Player has selected point "
+            + new string('a', 129) + " as their destination, routing locally [Team_CGP4][QuantumTravel]";
+        Assert.Null(GameLogParser.Parse(line));
+    }
+
     private static DateTimeOffset At(string time) =>
         DateTimeOffset.Parse("2026-10-26T" + time + "Z", System.Globalization.CultureInfo.InvariantCulture);
 }

@@ -70,8 +70,24 @@ internal sealed class Win32InputSink : IInputSink
         }
     }
 
-    private static Input ToInput(InputEvent inputEvent)
+    internal static Input ToInput(InputEvent inputEvent)
     {
+        if (inputEvent.WheelDelta != 0)
+        {
+            return new Input
+            {
+                Type = InputMouse,
+                Data = new InputUnion
+                {
+                    Mouse = new MouseInput
+                    {
+                        Flags = MouseEventFWheel,
+                        MouseData = unchecked((uint)inputEvent.WheelDelta),
+                    },
+                },
+            };
+        }
+
         if (!KeyMap.All.TryGetValue(inputEvent.Key, out var info))
         {
             throw new ArgumentException("Key is not in the key map.", nameof(inputEvent));

@@ -11,6 +11,11 @@ internal sealed class FakeInputSink(TimeProvider time) : IInputSink
 
     public List<string> Timeline { get; } = [];
 
+    public List<InputEvent[]> Batches { get; } = [];
+
+    /// <summary>Optional per-call insertion results, consumed before InsertLimit.</summary>
+    public Queue<int> InsertResults { get; } = new();
+
     /// <summary>When set, at most this many events are inserted per Send call (simulates UIPI/partial failure).</summary>
     public int? InsertLimit { get; set; }
 
@@ -20,10 +25,14 @@ internal sealed class FakeInputSink(TimeProvider time) : IInputSink
 
     public int Send(ReadOnlySpan<InputEvent> events)
     {
-        var count = Math.Min(events.Length, InsertLimit ?? int.MaxValue);
+        Batches.Add(events.ToArray());
+        var count = Math.Min(events.Length, InsertResults.TryDequeue(out var result) ? result : InsertLimit ?? int.MaxValue);
         for (var i = 0; i < count; i++)
         {
-            Timeline.Add($"{Now()}:{events[i].Key}{(events[i].Down ? "v" : "^")}");
+            var description = events[i].WheelDelta != 0
+                ? string.Create(CultureInfo.InvariantCulture, $"wheel({events[i].WheelDelta})")
+                : $"{events[i].Key}{(events[i].Down ? "v" : "^")}";
+            Timeline.Add($"{Now()}:{description}");
         }
 
         return count;

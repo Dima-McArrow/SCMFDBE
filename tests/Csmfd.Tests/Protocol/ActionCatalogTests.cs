@@ -24,6 +24,10 @@ public sealed class ActionCatalogTests
     [InlineData("masterMode", "b", Modifiers.None, ActionKind.Hold, 500)]
     [InlineData("operatorMode", "mouse3", Modifiers.None, ActionKind.Tap, null)]
     [InlineData("quantumEngage", "mouse1", Modifiers.None, ActionKind.Hold, 1500)]
+    [InlineData("coupledMode", "c", Modifiers.None, ActionKind.Tap, null)]
+    [InlineData("cruiseMode", "c", Modifiers.Alt, ActionKind.Tap, null)]
+    [InlineData("resetFlightAccelerometer", "c", Modifiers.RAlt, ActionKind.Tap, null)]
+    [InlineData("cycleConfiguration", "k", Modifiers.Alt, ActionKind.Tap, null)]
     [InlineData("exitSeat", "y", Modifiers.None, ActionKind.Hold, 1000)]
     [InlineData("selfDestruct", "backspace", Modifiers.None, ActionKind.Hold, 3000)]
     public void MatchesSpecTable(string action, string key, Modifiers mods, ActionKind kind, int? defaultHoldMs)
@@ -36,7 +40,7 @@ public sealed class ActionCatalogTests
     [Fact]
     public void ContainsOnlySpecActions()
     {
-        Assert.Equal(19, ActionCatalog.All.Count);
+        Assert.Equal(23, ActionCatalog.All.Count);
     }
 
     [Fact]

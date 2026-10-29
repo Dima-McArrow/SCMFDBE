@@ -3,10 +3,18 @@ using Csmfd.Protocol;
 namespace Csmfd.Core.Input;
 
 /// <summary>
-/// One synthetic key or mouse button transition. Key is a protocol key name (spec 40.7)
-/// or a modifier name: "ctrl", "shift", "alt", "ralt".
+/// One synthetic key/button transition or a discrete vertical wheel event. For transitions, Key is
+/// a protocol key name (spec 40.7) or a modifier name: "ctrl", "shift", "alt", "ralt".
 /// </summary>
-public readonly record struct InputEvent(string Key, bool Down);
+public readonly record struct InputEvent(string Key, bool Down)
+{
+    /// <summary>Zero for key/button transitions; otherwise exactly +120 or -120 (one Windows wheel click).</summary>
+    public int WheelDelta { get; private init; }
+
+    public static InputEvent Wheel(int step) => step is -1 or 1
+        ? new InputEvent("wheel", Down: false) { WheelDelta = step * 120 }
+        : throw new ArgumentOutOfRangeException(nameof(step));
+}
 
 /// <summary>Injects input into the OS. Implemented with SendInput on Windows.</summary>
 public interface IInputSink

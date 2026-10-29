@@ -46,6 +46,68 @@ public sealed class ClientMessageParserTests
         Assert.Null(key.Ms);
     }
 
+    [Theory]
+    [InlineData("client-key-coupled-mode-down.json", "coupledMode", "c", Modifiers.None)]
+    [InlineData("client-key-cruise-mode-down.json", "cruiseMode", "c", Modifiers.Alt)]
+    [InlineData("client-key-reset-flight-accelerometer-down.json", "resetFlightAccelerometer", "c", Modifiers.RAlt)]
+    [InlineData("client-key-cycle-configuration-down.json", "cycleConfiguration", "k", Modifiers.Alt)]
+    public void ParsesFlightControlFixture(string fixture, string action, string expectedKey, Modifiers mods)
+    {
+        var command = AssertSuccess<KeyCommand>(Fixture.Read(fixture));
+
+        Assert.Equal(new ActionSpec(action, expectedKey, mods, ActionKind.Tap, null), command.Spec);
+        Assert.Equal(KeyPhase.Down, command.Phase);
+        Assert.Null(command.Ms);
+    }
+
+    [Theory]
+    [InlineData("coupledMode", "c", "")]
+    [InlineData("cruiseMode", "c", "\"alt\"")]
+    [InlineData("resetFlightAccelerometer", "c", "\"ralt\"")]
+    [InlineData("cycleConfiguration", "k", "\"alt\"")]
+    public void RejectsIncorrectFlightControlChords(string action, string key, string mods)
+    {
+        foreach (var phase in new[] { "down", "up" })
+        {
+            var wrongKey = key == "c" ? "k" : "c";
+            var wrongKeyFailure = AssertFailure(
+                $$"""{"v":2,"type":"key","id":"4d88b2ad-d306-443a-8524-155575227708","action":"{{action}}","phase":"{{phase}}","key":"{{wrongKey}}","mods":[{{mods}}]}""",
+                ParseFailureKind.CommandRejected);
+            Assert.Equal(RejectReason.Invalid, wrongKeyFailure.Reason);
+
+            foreach (var wrongMods in new[] { "", "\"alt\"", "\"ralt\"", "\"alt\",\"ralt\"", "\"ctrl\"", "\"shift\"", "\"alt\",\"ctrl\"", "\"ralt\",\"shift\"", "\"alt\",\"alt\"", "\"ralt\",\"ralt\"" })
+            {
+                if (wrongMods == mods)
+                {
+                    continue;
+                }
+
+                var failure = AssertFailure(
+                    $$"""{"v":2,"type":"key","id":"4d88b2ad-d306-443a-8524-155575227708","action":"{{action}}","phase":"{{phase}}","key":"{{key}}","mods":[{{wrongMods}}]}""",
+                    ParseFailureKind.CommandRejected);
+                Assert.Equal(RejectReason.Invalid, failure.Reason);
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData("coupledMode", "c", "")]
+    [InlineData("cruiseMode", "c", "\"alt\"")]
+    [InlineData("resetFlightAccelerometer", "c", "\"ralt\"")]
+    [InlineData("cycleConfiguration", "k", "\"alt\"")]
+    public void RejectsIncorrectFlightControlPhasesAndDurations(string action, string key, string mods)
+    {
+        foreach (var phase in new[] { "hold", "toggle", "press", "down", "up" })
+        {
+            var ms = phase is "toggle" or "press" ? string.Empty : ",\"ms\":100";
+            var failure = AssertFailure(
+                $$"""{"v":2,"type":"key","id":"4d88b2ad-d306-443a-8524-155575227708","action":"{{action}}","phase":"{{phase}}","key":"{{key}}","mods":[{{mods}}]{{ms}}}""",
+                ParseFailureKind.CommandRejected);
+
+            Assert.Equal(RejectReason.Invalid, failure.Reason);
+        }
+    }
+
     [Fact]
     public void ParsesHoldKeyFixture()
     {

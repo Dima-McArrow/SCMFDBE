@@ -48,6 +48,7 @@ public static class MessageTypes
     public const string Paired = "paired";
     public const string Welcome = "welcome";
     public const string Key = "key";
+    public const string Wheel = "wheel";
     public const string Chat = "chat";
     public const string ReleaseAll = "releaseAll";
     public const string Ping = "ping";

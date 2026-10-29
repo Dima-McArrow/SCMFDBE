@@ -3,8 +3,8 @@ using System.Text.Json;
 namespace Csmfd.Protocol;
 
 /// <summary>
-/// Strict parser for client → server messages (contract v2, spec 41.6–41.12).
-/// Unknown fields are ignored; a missing required field is never treated as null.
+/// Strict parser for client → server messages (contract v2, spec 41.6–41.12, 41.26).
+/// Unknown fields are ignored except on wheel commands; a missing required field is never treated as null.
 /// </summary>
 public static class ClientMessageParser
 {
@@ -71,6 +71,7 @@ public static class ClientMessageParser
             MessageTypes.Pair => ParsePair(root),
             MessageTypes.Ping => ParsePing(root),
             MessageTypes.Key => ParseCommand(root, ParseKey),
+            MessageTypes.Wheel => ParseCommand(root, ParseWheel),
             MessageTypes.Chat => ParseCommand(root, ParseChat),
             MessageTypes.ReleaseAll => ParseCommand(root, static (_, id) => ParseResult.Success(new ReleaseAllCommand(id))),
             _ => ParseResult.Fail(new ParseFailure(ParseFailureKind.UnknownType, "unsupported message type")),
@@ -193,6 +194,34 @@ public static class ClientMessageParser
         }
 
         return ParseResult.Success(new KeyCommand(id, spec, phase, ms));
+    }
+
+    private static ParseResult ParseWheel(JsonElement root, Guid id)
+    {
+        // No client-controlled binding, axis, delta, duration or batch size, including future-looking fields.
+        foreach (var property in root.EnumerateObject())
+        {
+            if (property.Name is not ("v" or "type" or "id" or "action" or "step"))
+            {
+                return Rejected(id, RejectReason.Invalid, "unexpected wheel field");
+            }
+        }
+
+        if (!TryGetString(root, "action", out var action)
+            || !root.TryGetProperty("step", out var stepElement)
+            || stepElement.ValueKind != JsonValueKind.Number
+            || !stepElement.TryGetInt32(out var step)
+            || step is not (-1 or 1))
+        {
+            return Rejected(id, RejectReason.Invalid, "invalid wheel fields");
+        }
+
+        if (!WheelActionCatalog.All.TryGetValue(action, out var spec))
+        {
+            return Rejected(id, RejectReason.UnknownAction, "unknown wheel action");
+        }
+
+        return ParseResult.Success(new WheelCommand(id, spec, step));
     }
 
     private static ParseResult ParseChat(JsonElement root, Guid id)

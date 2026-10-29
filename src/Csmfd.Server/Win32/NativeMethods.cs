@@ -21,6 +21,7 @@ internal static partial class NativeMethods
     public const uint MouseEventFMiddleUp = 0x0040;
     public const uint MouseEventFXDown = 0x0080;
     public const uint MouseEventFXUp = 0x0100;
+    public const uint MouseEventFWheel = 0x0800;
     public const uint XButton1 = 0x0001;
     public const uint XButton2 = 0x0002;
 

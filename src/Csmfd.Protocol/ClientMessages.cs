@@ -18,6 +18,9 @@ public abstract record CommandMessage(Guid Id) : ClientMessage;
 /// <summary>Allowlisted key command. Ms is present only for <see cref="KeyPhase.Hold"/>.</summary>
 public sealed record KeyCommand(Guid Id, ActionSpec Spec, KeyPhase Phase, int? Ms) : CommandMessage(Id);
 
+/// <summary>One relative wheel step: Step is exactly +1 (increase) or -1 (decrease).</summary>
+public sealed record WheelCommand(Guid Id, WheelActionSpec Spec, int Step) : CommandMessage(Id);
+
 /// <summary>Structurally valid chat text; the emote allowlist is checked by the server.</summary>
 public sealed record ChatCommand(Guid Id, string Text) : CommandMessage(Id);
 

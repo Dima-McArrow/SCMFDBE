@@ -5,7 +5,7 @@ namespace Csmfd.Core.Input;
 /// <summary>
 /// Per-connection admission control before the executor (spec 41.6, 41.10):
 /// duplicate ids within the last 200 are never executed again, and new gestures
-/// (down/hold/chat) are limited to 30/s with a burst of 30. Up and releaseAll are never rate limited.
+/// (down/hold/chat/wheel) share a limit of 30/s with a burst of 30. Up and releaseAll are never rate limited.
 /// Not thread-safe: owned by one connection's receive loop.
 /// </summary>
 public sealed class CommandGate
@@ -65,6 +65,7 @@ public sealed class CommandGate
     {
         KeyCommand key => key.Phase != KeyPhase.Up,
         ChatCommand => true,
+        WheelCommand => true,
         _ => false,
     };
 

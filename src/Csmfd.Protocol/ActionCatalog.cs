@@ -49,6 +49,10 @@ public static class ActionCatalog
         Hold("masterMode", "b", 500),
         Tap("operatorMode", "mouse3"),
         Hold("quantumEngage", "mouse1", 1500),
+        Tap("coupledMode", "c"),
+        Tap("cruiseMode", "c", Modifiers.Alt),
+        Tap("resetFlightAccelerometer", "c", Modifiers.RAlt),
+        Tap("cycleConfiguration", "k", Modifiers.Alt),
         Hold("exitSeat", "y", 1000),
         Hold("selfDestruct", "backspace", 3000),
     }.ToFrozenDictionary(spec => spec.Action, StringComparer.Ordinal);

@@ -83,6 +83,7 @@ public sealed class InputMonitor(TimeProvider time)
         var text = command switch
         {
             KeyCommand key => Describe(key),
+            WheelCommand wheel => $"{wheel.Spec.Action}  {string.Join('+', ModifierLabels(wheel.Spec.Mods))}+Wheel  {(wheel.Step > 0 ? "increase" : "decrease")}",
             ChatCommand chat => "chat " + chat.Text,
             ReleaseAllCommand => "releaseAll",
             _ => command.GetType().Name,
@@ -116,7 +117,9 @@ public sealed class InputMonitor(TimeProvider time)
         var parts = new string[events.Length];
         for (var i = 0; i < events.Length; i++)
         {
-            parts[i] = KeyLabel(events[i].Key) + (events[i].Down ? "↓" : "↑");
+            parts[i] = events[i].WheelDelta != 0
+                ? (events[i].WheelDelta > 0 ? "Wheel+120" : "Wheel-120")
+                : KeyLabel(events[i].Key) + (events[i].Down ? "↓" : "↑");
         }
 
         var text = string.Join(' ', parts);

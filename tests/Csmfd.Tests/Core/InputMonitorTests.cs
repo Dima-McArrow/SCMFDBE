@@ -61,6 +61,25 @@ public sealed class InputMonitorTests
         Assert.Equal(entries[0].Ref, entries[1].Ref);
     }
 
+    [Theory]
+    [InlineData("speedLimiter", "alt", 1, "Alt", "increase", "Wheel+120")]
+    [InlineData("accelerationLimiter", "ralt", -1, "RAlt", "decrease", "Wheel-120")]
+    public void WheelIsVisibleThroughTheExistingObservedSink(string action, string modifier, int step, string label, string direction, string wheelLabel)
+    {
+        var monitor = new InputMonitor(_time) { Enabled = true };
+        var inner = new FakeInputSink(_time);
+        var sink = new ObservedInputSink(inner, monitor);
+        var command = new WheelCommand(Guid.NewGuid(), WheelActionCatalog.All[action], step);
+
+        monitor.Received("iPad", command);
+        Assert.Equal(3, sink.Send([new InputEvent(modifier, true), InputEvent.Wheel(step), new InputEvent(modifier, false)]));
+        monitor.Result(command.Id, AckStatus.Sent, null);
+
+        Assert.Equal(
+            [$"iPad: {action}  {label}+Wheel  {direction}", $"{label}↓ {wheelLabel} {label}↑", "sent"],
+            Drain(monitor).Select(e => e.Text));
+    }
+
     [Fact]
     public void IsBoundedAndClearsWhenDisabled()
     {

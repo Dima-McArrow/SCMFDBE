@@ -194,6 +194,8 @@ csmfd-probe --host <ip> --fp <hex> --token <token> --stay 120       # idle clien
 | Observed Party MVP (41.24) | Six notification facts through the existing bounded activity journal; no BE roster/calculations. Requires updated iPad app; Mac and in-game verification pending |
 | Protocol v2, WSS/TLS with pinning, pairing, revoke | Implemented and tested; works with the iPad app over the LAN (2026-10-27) |
 | Commands from the iPad | Received, validated and shown in the Input monitor; in-game effect still to be verified |
+| Four FE flight controls (41.10) | Added to the 23-action key allowlist as taps; Windows build/tests/format verification and in-game binding verification pending |
+| Limiter wheels (41.26) | Two dedicated server-bound single-step actions implemented; FE callbacks are still prototypes. Windows verification and intended in-game bindings/directions pending |
 | Game.log: ship channel join/leave, vehicle destroyed, QT target, ATC | Implemented; checked on real logs (join verified live 2026-10-28, destruction replayed on every real log that has one). Drives the iPad Deck and theme through `shipContext` (iPad `FIX-07`) |
 | Session rewards/contracts activity feed (41.21) | Implemented; bounded 256-event replay, four-event pages, no BE disk ledger. Build/WSS tests and read-only real-log replay checked; in-game coverage/frametime not measured |
 | Ship-channel observations in activity (41.22) | Removed 2026-10-28: ship channels travel only in `state` (spec 41.23) |
@@ -232,7 +234,68 @@ calculation is introduced. This does not change menu-reentry recovery.
 - If the process is killed, its watchdog cannot release keys (graceful exit always releases).
 - If the anti-cheat denies reading the game's image path, focus falls back to the process name (logged).
 - Chat `KEYEVENTF_UNICODE` typing, chat key toggling, hold durations and F8 still need in-game calibration.
+- The four flight-control chords below match the current FE bindings but have not been verified in game.
+- Limiter wheels: Left Alt+Wheel for Speed and Right Alt+Wheel for Acceleration are intended bindings, not
+  game-verified defaults. FE callbacks still need connection to the new `wheel` command; no limiter value telemetry.
 - Self-destruct is protected only by the iPad slider; a paired client can send the allowed hold directly.
+
+## Flight controls (protocol 41.10)
+
+The key allowlist contains 23 actions, including these four existing FE controls:
+
+| Action | Key | Wire `mods` | Phases |
+|---|---|---|---|
+| `coupledMode` | C (`c`) | `[]` | `down` / `up` |
+| `cruiseMode` | C (`c`) | `["alt"]` (Left Alt) | `down` / `up` |
+| `resetFlightAccelerometer` | C (`c`) | `["ralt"]` (Right Alt) | `down` / `up` |
+| `cycleConfiguration` | K (`k`) | `["alt"]` (Left Alt) | `down` / `up` |
+
+These use the existing tap protocol: no `hold`, `toggle` phase or `ms` field. The parser requires the exact
+action/key/modifier combination. Coupled and Cruise ON/OFF indications are local FE presentation following
+successful taps; the server adds no toggle state or telemetry. These taps retain protocol v2 and existing executor behavior;
+the existing focus, physical-key conflict and safety-release checks apply. Limiter wheels use the separate
+command below.
+
+The bindings are taken from the current FE definitions, not confirmed game defaults. Windows build, tests and
+format verification are pending for this change. Verify all four bindings and Left/Right Alt behavior in game
+with the matching FE and BE builds before treating the controls as game-validated.
+
+## Speed and Acceleration limiter wheels (protocol 41.26)
+
+Protocol v2 adds `wheel` alongside the existing key commands. There are 23 key actions and two separate wheel
+actions; wheel actions cannot be sent as `key` commands. Only these five fields are accepted:
+
+```json
+{"v":2,"type":"wheel","id":"71b5d971-9ef6-48af-b4ab-668a2b991101","action":"speedLimiter","step":1}
+```
+
+| Action | BE-owned binding | `step: 1` | `step: -1` |
+|---|---|---|---|
+| `speedLimiter` | Left Alt + vertical wheel | Wheel +120 (increase) | Wheel -120 (decrease) |
+| `accelerationLimiter` | Right Alt + vertical wheel | Wheel +120 (increase) | Wheel -120 (decrease) |
+
+`step` must be the JSON integer `1` or `-1`. No `key`, `mods`, `phase`, `ms`, delta, axis, batch size or other
+extra fields are accepted (`rejected/invalid`). Unknown wheel actions get `rejected/unknown_action`.
+Each step uses one fresh lowercase UUID and one request, with no separate down/up or release command.
+Four `client-wheel-*.json` files in `tests/Csmfd.Tests/Fixtures/Protocol` are the FE reference requests.
+
+The executor checks the existing age, pause, blocked-input, active-gesture, session-lock, game/focus and physical
+modifier rules, then submits one batch: modifier down, one wheel event, modifier up. Wheel shares the existing
+30/s, burst-30 command budget and last-200-ID deduplication with keys/chat. A step while another gesture is
+active is rejected as `busy`; it is never queued for later execution.
+
+The existing ack DTO is reused: `sent` means the complete input batch was inserted, not that the game changed
+its limiter. Partial insertion gets `rejected/input_failed`; the wheel may already have fired. Cleanup releases
+only the inserted modifier, never repeats the wheel, and blocks new input after a failed release until local
+re-enable. A completed wheel has no held state, timer or later completion message. No limiter state or telemetry
+is published. Input monitor shows the action, direction and wheel delta.
+
+FE integration: map each existing `onStep(.increase)` to `step: 1`, `.decrease` to `step: -1`, and use the action
+for that drum through the normal authenticated pending-command/ack path. Bound outgoing work and discard steps
+that cannot be submitted immediately; do not accumulate a drag backlog, retry failures, resend after a lost ack
+or replay after reconnect. Use the updated BE; older builds do not recognize `wheel`. This change does not modify
+FE source code, so the current callbacks remain empty. Both intended game bindings and directions still need
+in-game verification. Windows build, tests and format verification are pending.
 
 ## Session rewards and contracts (protocol 41.21)
 

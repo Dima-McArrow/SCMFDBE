@@ -133,6 +133,9 @@ public sealed class InputExecutor : IDisposable
                 case ChatCommand chat:
                     HandleChat(connectionId, chat, receivedTimestamp);
                     break;
+                case WheelCommand wheel:
+                    HandleWheel(connectionId, wheel, receivedTimestamp);
+                    break;
                 case ReleaseAllCommand releaseAll:
                     HandleReleaseAll(connectionId, releaseAll);
                     break;
@@ -288,6 +291,34 @@ public sealed class InputExecutor : IDisposable
         var released = ReleaseHeld(gesture);
         Clear(gesture);
         AckRelease(connectionId, up.Id, released);
+    }
+
+    private void HandleWheel(Guid connectionId, WheelCommand command, long receivedTimestamp)
+    {
+        var modifier = command.Spec.Mods == Modifiers.Alt ? "alt" : "ralt";
+        if (CheckCanStart(receivedTimestamp, [modifier]) is { } rejection)
+        {
+            _output.Ack(connectionId, command.Id, AckStatus.Rejected, rejection);
+            return;
+        }
+
+        // One synchronous batch under the executor lock: no timer, pending gesture or client-side up.
+        InputEvent[] events = [new(modifier, Down: true), InputEvent.Wheel(command.Step), new(modifier, Down: false)];
+        var inserted = _sink.Send(events);
+        if (inserted == events.Length)
+        {
+            _output.Ack(connectionId, command.Id, AckStatus.Sent);
+            return;
+        }
+
+        // The wheel may already have fired. Never replay it; release only our inserted modifier down.
+        if (inserted > 0 && inserted < events.Length
+            && _sink.Send([new InputEvent(modifier, Down: false)]) != 1)
+        {
+            Block();
+        }
+
+        _output.Ack(connectionId, command.Id, AckStatus.Rejected, RejectReason.InputFailed);
     }
 
     private void HandleChat(Guid connectionId, ChatCommand chat, long receivedTimestamp)

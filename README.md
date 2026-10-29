@@ -205,7 +205,7 @@ csmfd-probe --host <ip> --fp <hex> --token <token> --stay 120       # idle clien
 The exact observed channel name `Corsair PYAM Exec` maps to Drake (`DRAK`) and the verified model
 `DRAK_Corsair_Exec_StealthIndustrial`. Join/leave and existing entity binding now recognize this variant;
 arbitrary channels beginning with Corsair are not accepted. No protocol change, new reader, polling or FE
-calculation is introduced. This does not change menu-reentry recovery or QT binding for other ships.
+calculation is introduced. This does not change menu-reentry recovery.
 
 ## Known limits (honest list)
 
@@ -219,12 +219,13 @@ calculation is introduced. This does not change menu-reentry recovery or QT bind
   join. Menu exit does not end the Party/reward activity capture; SystemQuit/process exit still does.
 - A ship channel whose ship name contains a control (Cc) or format (Cf) character, or is longer than the name
   limit (128 scalars), is ignored (`GameLogParser`): the iPad Deck does not turn on and the theme does not change.
-- QT: `Player Selected Quantum Target - Local` becomes the last observed local `destination`, independently
-  of ship-channel state, entity binding or spawn (owner decision, 2026-10-29). Ship join/leave, ClearDriver and
-  destruction preserve it; PU exit, process/SystemQuit and log reset clear it. This confirms a selection, not
-  a currently locked target or completed jump. Names remain technical (`displayName` null); `freeMode` and
-  target-cleared events are not emitted because no verified source was established. Missing selection records
-  cannot be reconstructed. QT alone does not enable the Deck or identify a ship.
+- QT: `Player Selected Quantum Target - Local` becomes the last observed local `destination`,
+  independently of ship-channel state, entity binding or spawn (owner decision, 2026-10-29). A
+  ship-channel join and ClearDriver keep it; leaving the current ship channel, vehicle destruction,
+  PU exit, process/SystemQuit and log reset clear it. This confirms a selection, not a currently
+  locked target or completed jump. Names remain technical (`displayName` null); `freeMode` and
+  target-cleared events are not emitted because no verified source was established. Missing
+  selection records cannot be reconstructed. QT alone does not enable the Deck or identify a ship.
 - ATC `answered` means a hangar notification arrived after our request in the same context; there is no
   request id in the log, so a late answer to an earlier request can still be attributed to the newer one.
 - Foreground check and `SendInput` are not atomic; focus can change in between (spec 41.4).
@@ -271,7 +272,7 @@ app on Mac and use the matching updated BE build. Check the Party tab in portrai
 
 The selected local QT destination is independent of ship identity. The existing single reader publishes
 it even without a spawn, a recognized channel or a bound entity. No new reader, polling, timer, history or
-input action is added. The wire shape stays unchanged. See `QT-LOCAL-TARGET-BE-HANDOFF.md` in the root of
-the companion SCMFD repository for FE validation and the semantic update required in the shared spec.
-FE source and the existing shared spec were not edited in this BE-only step. This owner decision supersedes
-the earlier bound-ship gate and unconditional ship-transition QT resets.
+input action is added. The wire shape stays unchanged. Spec 41.25 (`..\SCMFD\Claude outputs\CSMFD-discussion.md`)
+is the source of truth. It drops the ship-ID binding requirement for QT (41.14) and the QT resets on a
+ship-channel join and on ClearDriver (41.9); QT is still cleared when the ship goes away (`59bb202`).
+Background and FE validation notes: `QT-LOCAL-TARGET-BE-HANDOFF.md` in the SCMFD repository root.

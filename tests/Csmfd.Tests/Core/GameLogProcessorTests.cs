@@ -114,15 +114,33 @@ public sealed class GameLogProcessorTests : IDisposable
     }
 
     [Fact]
-    public void ShipChangesPreserveTheLastLocalSelectionUntilAnActualSessionOrLogReset()
+    public void LocalSelectionSurvivesAJoinButIsClearedWhenTheShipGoesAwayOrTheSessionEnds()
     {
+        // A selection logged right before the join line is kept.
         Feed(Target);
         var selected = State.QtTarget;
-        Feed(Join, Left, Join, Destroyed);
+        Feed(Join);
+        Assert.Equal(1, State.ShipContext.Revision);
         Assert.Equal(selected, State.QtTarget);
-        Feed(Quit);
+
+        Feed(Left);
+        Assert.Equal(ShipContextReason.ChannelLeft, State.ShipContext.Reason);
         Assert.Equal(QtTargetState.Unknown, State.QtTarget);
+
+        Feed(Join, Target);
+        Assert.Equal("Stanton4a", State.QtTarget.InternalName);
+        Feed(Destroyed);
+        Assert.Equal(ShipContextReason.VehicleDestroyed, State.ShipContext.Reason);
+        Assert.Equal(QtTargetState.Unknown, State.QtTarget);
+
         Feed(Target);
+        Assert.Equal("Stanton4a", State.QtTarget.InternalName);
+        Feed(Quit);
+        Assert.Equal(ShipContextReason.GameEnded, State.ShipContext.Reason);
+        Assert.Equal(QtTargetState.Unknown, State.QtTarget);
+
+        Feed(Target);
+        Assert.Equal("Stanton4a", State.QtTarget.InternalName);
         _processor.OnGenerationReset(Guid.NewGuid());
         Assert.Equal(QtTargetState.Unknown, State.QtTarget);
     }
@@ -198,7 +216,7 @@ public sealed class GameLogProcessorTests : IDisposable
         Assert.Equal(ShipContextReason.ChannelLeft, State.ShipContext.Reason);
         Assert.Equal(contextId, State.ShipContext.ContextId);
         Assert.Equal("DRAK", State.ShipContext.ManufacturerPrefix);
-        Assert.Equal("Stanton4a", State.QtTarget.InternalName);
+        Assert.Equal(QtTargetState.Unknown, State.QtTarget);
         Assert.Equal(["0:lv", "0:l^"], _sink.Timeline);
     }
 
@@ -236,7 +254,7 @@ public sealed class GameLogProcessorTests : IDisposable
         Assert.Equal(2, State.ShipContext.Revision);
         Assert.Equal(ShipContextStatus.NoShip, State.ShipContext.Status);
         Assert.Equal(ShipContextReason.VehicleDestroyed, State.ShipContext.Reason);
-        Assert.Equal("Stanton4a", State.QtTarget.InternalName);
+        Assert.Equal(QtTargetState.Unknown, State.QtTarget);
         Assert.Equal(["0:lv", "0:l^"], _sink.Timeline);
     }
 
@@ -479,7 +497,7 @@ public sealed class GameLogProcessorTests : IDisposable
         Feed(Left.Replace("Drake Cutter Rambler", name, StringComparison.Ordinal));
         Assert.Null(State.Ship);
         Assert.Equal(ShipContextReason.ChannelLeft, State.ShipContext.Reason);
-        Assert.Equal("Stanton4a", State.QtTarget.InternalName);
+        Assert.Equal(QtTargetState.Unknown, State.QtTarget);
     }
 
     private void PressLights() =>

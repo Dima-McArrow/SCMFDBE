@@ -364,14 +364,21 @@ public sealed partial class GameLogProcessor : IDisposable
         return true;
     }
 
-    /// <summary>A ship transition clears ATC; local QT selection survives ship changes, but not capture/session end.</summary>
+    /// <summary>
+    /// A real context transition: new revision, ATC cleared, published urgently. QT is cleared when the ship
+    /// goes away or the session/capture ends, but not on a join: a local selection logged right before the
+    /// join line must survive, and leaving the previous ship already cleared the old one.
+    /// </summary>
     private void Transition(ShipContextStatus status, ShipContextReason reason, DateTimeOffset at)
     {
         _revision++;
         _status = status;
         _lastReason = reason;
         _contextObservedAt = at;
-        if (reason is ShipContextReason.GameEnded or ShipContextReason.LogReset)
+        if (reason is ShipContextReason.ChannelLeft
+            or ShipContextReason.VehicleDestroyed
+            or ShipContextReason.GameEnded
+            or ShipContextReason.LogReset)
         {
             _qt = QtTargetState.Unknown;
         }

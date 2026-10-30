@@ -37,13 +37,16 @@ public sealed class WheelWssTests : IAsyncLifetime
             var ack = await client.ReceiveTypeAsync("ack");
             Assert.Equal(id.ToString("D"), ack["id"]!.GetValue<string>());
             Assert.Equal("sent", ack["status"]!.GetValue<string>());
-            Assert.Equal([new InputEvent(modifier, true), InputEvent.Wheel(step), new InputEvent(modifier, false)], Assert.Single(_server.Sink.Batches));
+            // The ack follows the modifier release, so all three timed batches are already in.
+            Assert.Equal(
+                [[new InputEvent(modifier, true)], [InputEvent.Wheel(step)], [new InputEvent(modifier, false)]],
+                _server.Sink.Batches);
 
             await client.SendAsync(Message(id, action, -step));
             var duplicate = await client.ReceiveTypeAsync("ack");
             Assert.Equal("rejected", duplicate["status"]!.GetValue<string>());
             Assert.Equal("duplicate", duplicate["reason"]!.GetValue<string>());
-            Assert.Single(_server.Sink.Batches);
+            Assert.Equal(3, _server.Sink.Batches.Count);
         }
     }
 
@@ -61,18 +64,21 @@ public sealed class WheelWssTests : IAsyncLifetime
             Assert.Empty(_server.Sink.Batches);
 
             _server.Game.Focus = GameFocus.Focused;
-            _server.Sink.InsertResults.Enqueue(2);
+            // Modifier down inserted, wheel insertion fails: only the modifier is released.
+            _server.Sink.InsertResults.Enqueue(1);
+            _server.Sink.InsertResults.Enqueue(0);
             var failedId = Guid.NewGuid();
             await client.SendAsync(Message(failedId, "accelerationLimiter", -1));
             var failed = await client.ReceiveTypeAsync("ack");
             Assert.Equal(failedId.ToString("D"), failed["id"]!.GetValue<string>());
             Assert.Equal("rejected", failed["status"]!.GetValue<string>());
             Assert.Equal("input_failed", failed["reason"]!.GetValue<string>());
-            Assert.Equal([new InputEvent("ralt", false)], _server.Sink.Batches[1]);
+            Assert.Equal([new InputEvent("ralt", false)], _server.Sink.Batches[2]);
+            Assert.DoesNotContain(_server.Sink.Timeline, e => e.Contains("wheel(", StringComparison.Ordinal));
 
             await client.SendAsync(Message(failedId, "accelerationLimiter", -1));
             Assert.Equal("duplicate", (await client.ReceiveTypeAsync("ack"))["reason"]!.GetValue<string>());
-            Assert.Equal(2, _server.Sink.Batches.Count);
+            Assert.Equal(3, _server.Sink.Batches.Count);
         }
     }
 

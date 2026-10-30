@@ -17,6 +17,15 @@ public sealed record InputExecutorOptions
 
     public TimeSpan ChatSubmitDelay { get; init; } = TimeSpan.FromMilliseconds(100);
 
+    /// <summary>
+    /// Time the limiter modifier is held before the wheel event. The game samples input per frame, so a
+    /// modifier pressed and released in the same batch as the wheel is never seen together with it.
+    /// </summary>
+    public TimeSpan WheelModifierLead { get; init; } = TimeSpan.FromMilliseconds(50);
+
+    /// <summary>Time the limiter modifier stays held after the wheel event, for the same reason.</summary>
+    public TimeSpan WheelModifierTrail { get; init; } = TimeSpan.FromMilliseconds(50);
+
     public ChatKey ChatKey { get; init; } = ChatKey.Enter;
 }
 
@@ -69,6 +78,7 @@ public sealed class InputExecutor : IDisposable
         Tap,
         Hold,
         Chat,
+        Wheel,
     }
 
     private enum TimerPurpose
@@ -77,6 +87,13 @@ public sealed class InputExecutor : IDisposable
         HoldDeadline,
         DelayedRelease,
         ChatStep,
+        WheelStage,
+    }
+
+    private enum WheelStage
+    {
+        SendWheel,
+        ReleaseModifier,
     }
 
     private enum ChatStep
@@ -302,23 +319,63 @@ public sealed class InputExecutor : IDisposable
             return;
         }
 
-        // One synchronous batch under the executor lock: no timer, pending gesture or client-side up.
-        InputEvent[] events = [new(modifier, Down: true), InputEvent.Wheel(command.Step), new(modifier, Down: false)];
-        var inserted = _sink.Send(events);
-        if (inserted == events.Length)
+        // Modifier down now, wheel after WheelModifierLead, modifier up after WheelModifierTrail.
+        // A single batch would put all three events into one game frame, so the wheel would arrive unmodified.
+        if (!Press([modifier]))
         {
-            _output.Ack(connectionId, command.Id, AckStatus.Sent);
+            _output.Ack(connectionId, command.Id, AckStatus.Rejected, RejectReason.InputFailed);
             return;
         }
 
-        // The wheel may already have fired. Never replay it; release only our inserted modifier down.
-        if (inserted > 0 && inserted < events.Length
-            && _sink.Send([new InputEvent(modifier, Down: false)]) != 1)
+        var gesture = new Gesture(connectionId, command.Id, GestureKind.Wheel, spec: null)
         {
-            Block();
-        }
+            DownTimestamp = _time.GetTimestamp(),
+            WheelStep = command.Step,
+            WheelStage = WheelStage.SendWheel,
+        };
+        gesture.Held.Add(modifier);
+        _active = gesture;
+        Schedule(gesture, _options.WheelModifierLead, TimerPurpose.WheelStage);
+    }
 
-        _output.Ack(connectionId, command.Id, AckStatus.Rejected, RejectReason.InputFailed);
+    private void AdvanceWheel(Gesture gesture)
+    {
+        switch (gesture.WheelStage)
+        {
+            case WheelStage.SendWheel:
+                // Never scroll another window: focus may have changed during the lead time.
+                if (_game.Check() != GameFocus.Focused)
+                {
+                    AbortWheel(gesture, RejectReason.GameNotFocused);
+                    return;
+                }
+
+                // Never replayed: a failed insertion only releases the modifier.
+                if (_sink.Send([InputEvent.Wheel(gesture.WheelStep)]) != 1)
+                {
+                    AbortWheel(gesture, RejectReason.InputFailed);
+                    return;
+                }
+
+                gesture.WheelStage = WheelStage.ReleaseModifier;
+                Schedule(gesture, _options.WheelModifierTrail, TimerPurpose.WheelStage);
+                break;
+
+            case WheelStage.ReleaseModifier:
+                // The ack is sent only now, so the client's single pending step paces the drum.
+                var released = ReleaseHeld(gesture);
+                Clear(gesture);
+                AckRelease(gesture.ConnectionId, gesture.CommandId, released);
+                break;
+        }
+    }
+
+    private void AbortWheel(Gesture gesture, RejectReason reason)
+    {
+        // ReleaseHeld blocks input itself when the modifier up cannot be inserted.
+        ReleaseHeld(gesture);
+        Clear(gesture);
+        _output.Ack(gesture.ConnectionId, gesture.CommandId, AckStatus.Rejected, reason);
     }
 
     private void HandleChat(Guid connectionId, ChatCommand chat, long receivedTimestamp)
@@ -455,6 +512,9 @@ public sealed class InputExecutor : IDisposable
                 case TimerPurpose.ChatStep:
                     AdvanceChat(gesture);
                     break;
+                case TimerPurpose.WheelStage:
+                    AdvanceWheel(gesture);
+                    break;
             }
         }
     }
@@ -538,9 +598,9 @@ public sealed class InputExecutor : IDisposable
         var released = ReleaseHeld(gesture);
         Clear(gesture);
 
-        if (gesture.Kind == GestureKind.Chat)
+        if (gesture.Kind is GestureKind.Chat or GestureKind.Wheel)
         {
-            // The chat ack has not been sent yet; it becomes the terminal rejection.
+            // The chat/wheel ack has not been sent yet; it becomes the terminal rejection.
             _output.Ack(gesture.ConnectionId, gesture.CommandId, AckStatus.Rejected, RejectReason.Cancelled);
         }
         else if (gesture.PendingUpId is { } upId)
@@ -714,5 +774,10 @@ public sealed class InputExecutor : IDisposable
         public string? ChatText { get; init; }
 
         public ChatStep ChatStep { get; set; }
+
+        /// <summary>+1 or -1 for a wheel gesture; unused otherwise.</summary>
+        public int WheelStep { get; init; }
+
+        public WheelStage WheelStage { get; set; }
     }
 }

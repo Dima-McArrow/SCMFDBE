@@ -195,7 +195,7 @@ csmfd-probe --host <ip> --fp <hex> --token <token> --stay 120       # idle clien
 | Protocol v2, WSS/TLS with pinning, pairing, revoke | Implemented and tested; works with the iPad app over the LAN (2026-10-27) |
 | Commands from the iPad | Received, validated and shown in the Input monitor; in-game effect still to be verified |
 | Four FE flight controls (41.10) | Added to the 23-action key allowlist as taps; Windows build/tests/format verification and in-game binding verification pending |
-| Limiter wheels (41.26) | Two dedicated server-bound single-step actions implemented; FE callbacks are still prototypes. Windows verification and intended in-game bindings/directions pending |
+| Limiter wheels (41.26) | Two dedicated server-bound single-step actions implemented as timed modifier/wheel/modifier gestures; FE drums connected. Intended in-game bindings/directions pending |
 | Game.log: ship channel join/leave, vehicle destroyed, QT target, ATC | Implemented; checked on real logs (join verified live 2026-10-28, destruction replayed on every real log that has one). Drives the iPad Deck and theme through `shipContext` (iPad `FIX-07`) |
 | Session rewards/contracts activity feed (41.21) | Implemented; bounded 256-event replay, four-event pages, no BE disk ledger. Build/WSS tests and read-only real-log replay checked; in-game coverage/frametime not measured |
 | Ship-channel observations in activity (41.22) | Removed 2026-10-28: ship channels travel only in `state` (spec 41.23) |
@@ -280,22 +280,28 @@ Each step uses one fresh lowercase UUID and one request, with no separate down/u
 Four `client-wheel-*.json` files in `tests/Csmfd.Tests/Fixtures/Protocol` are the FE reference requests.
 
 The executor checks the existing age, pause, blocked-input, active-gesture, session-lock, game/focus and physical
-modifier rules, then submits one batch: modifier down, one wheel event, modifier up. Wheel shares the existing
-30/s, burst-30 command budget and last-200-ID deduplication with keys/chat. A step while another gesture is
-active is rejected as `busy`; it is never queued for later execution.
+modifier rules, then runs a short timed gesture: modifier down, one wheel event after `WheelModifierLead`
+(50 ms), modifier up after `WheelModifierTrail` (50 ms). The game samples input per frame, so a single batch
+(modifier down, wheel, modifier up at once) reached the game as an unmodified wheel. Focus is checked again
+before the wheel event. Wheel shares the existing 30/s, burst-30 command budget and last-200-ID deduplication
+with keys/chat. A step while another gesture (including another step) is active is rejected as `busy`; it is
+never queued for later execution.
 
-The existing ack DTO is reused: `sent` means the complete input batch was inserted, not that the game changed
-its limiter. Partial insertion gets `rejected/input_failed`; the wheel may already have fired. Cleanup releases
-only the inserted modifier, never repeats the wheel, and blocks new input after a failed release until local
-re-enable. A completed wheel has no held state, timer or later completion message. No limiter state or telemetry
-is published. Input monitor shows the action, direction and wheel delta.
+The existing ack DTO is reused and is sent once, after the modifier is released: `sent` means the whole
+sequence was inserted, not that the game changed its limiter. A failed modifier press or wheel insertion gets
+`rejected/input_failed` and never repeats the wheel; a focus loss before the wheel gets
+`rejected/game_not_focused`. Cancel, releaseAll, focus loss or disconnect during the gesture release the
+modifier and end the step as `rejected/cancelled` (the wheel may already have fired). A failed modifier release
+blocks new input until local re-enable. No limiter state or telemetry is published. Input monitor shows the
+action, direction and wheel delta.
 
 FE integration: map each existing `onStep(.increase)` to `step: 1`, `.decrease` to `step: -1`, and use the action
 for that drum through the normal authenticated pending-command/ack path. Bound outgoing work and discard steps
 that cannot be submitted immediately; do not accumulate a drag backlog, retry failures, resend after a lost ack
-or replay after reconnect. Use the updated BE; older builds do not recognize `wheel`. This change does not modify
-FE source code, so the current callbacks remain empty. Both intended game bindings and directions still need
-in-game verification. Windows build, tests and format verification are pending.
+or replay after reconnect. Use the updated BE; older builds do not recognize `wheel`. The FE drums send these
+commands and keep one pending step at a time, so the ack-after-release paces dragging to about ten steps per
+second. Windows build, tests and format pass; both intended game bindings and directions still need in-game
+verification.
 
 ## Session rewards and contracts (protocol 41.21)
 

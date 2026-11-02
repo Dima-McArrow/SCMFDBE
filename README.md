@@ -136,7 +136,7 @@ the window is open, keeps at most 2000 pending entries in memory, never writes t
 | `config.json` | `bindAddress`, `gameExePath`, `gameLogPath`, `chatKey` (`enter`/`f12`), `displayName`, `serverId` |
 | `server-certificate.bin` | ECDSA P-256 certificate + key, PKCS#12 protected with DPAPI (CurrentUser). Created once; deleting it requires re-pairing |
 | `trusted-devices.json` | Device id, name, pairing time and **SHA-256 of the token** (never the token) |
-| `emotes.txt` | Chat allowlist, one base name per line (`/name` and `/name<N>` accepted). **Sync with `Emote.swift`** |
+| `emotes.txt` | Chat allowlist, one base name per line (`/name` and `/name<N>` accepted). **Sync with `Emote.swift`**. Written only when missing; built-in names it lacks are logged as a warning at start |
 | `logs\csmfd*.log` | Lifecycle and warnings (plus decisions while Debug logging is on), 3 × 1 MiB. No tokens, codes, keys or Game.log content |
 
 ## How it maps to the spec
@@ -195,6 +195,7 @@ csmfd-probe --host <ip> --fp <hex> --token <token> --stay 120       # idle clien
 | Protocol v2, WSS/TLS with pinning, pairing, revoke | Implemented and tested; works with the iPad app over the LAN (2026-10-27) |
 | Commands from the iPad | Received, validated and shown in the Input monitor; in-game effect still to be verified |
 | Four FE flight controls (41.10) | Added to the 23-action key allowlist as taps; Windows build/tests/format verification and in-game binding verification pending |
+| Combat emotes (41.27) | Six keypad taps (`combatLeft` … `combatNo`, Keypad 1–6) in the key allowlist, now 29 actions; no chat. Windows build/tests/format and in-game verification pending; iPad still sends them as chat until updated |
 | Limiter wheels (41.26) | Two dedicated server-bound single-step actions implemented as timed modifier/wheel/modifier gestures; FE drums connected. Intended in-game bindings/directions pending |
 | Game.log: ship channel join/leave, vehicle destroyed, QT target, ATC | Implemented; checked on real logs (join verified live 2026-10-28, destruction replayed on every real log that has one). Drives the iPad Deck and theme through `shipContext` (iPad `FIX-07`) |
 | Session rewards/contracts activity feed (41.21) | Implemented; bounded 256-event replay, four-event pages, no BE disk ledger. Build/WSS tests and read-only real-log replay checked; in-game coverage/frametime not measured |
@@ -237,11 +238,14 @@ calculation is introduced. This does not change menu-reentry recovery.
 - The four flight-control chords below match the current FE bindings but have not been verified in game.
 - Limiter wheels: Left Alt+Wheel for Speed and Right Alt+Wheel for Acceleration are intended bindings, not
   game-verified defaults. FE callbacks still need connection to the new `wheel` command; no limiter value telemetry.
+- Combat emotes use the default Keypad 1–6 bindings (not game-verified). Keypad scan codes are sent without the E0
+  prefix; whether the game reacts with NumLock off is untested, and the physical-key conflict check sees a held
+  keypad key only while NumLock is on.
 - Self-destruct is protected only by the iPad slider; a paired client can send the allowed hold directly.
 
 ## Flight controls (protocol 41.10)
 
-The key allowlist contains 23 actions, including these four existing FE controls:
+The key allowlist contains 29 actions, including these four existing FE controls:
 
 | Action | Key | Wire `mods` | Phases |
 |---|---|---|---|
@@ -260,9 +264,27 @@ The bindings are taken from the current FE definitions, not confirmed game defau
 format verification are pending for this change. Verify all four bindings and Left/Right Alt behavior in game
 with the matching FE and BE builds before treating the controls as game-validated.
 
+## Combat emotes (protocol 41.27)
+
+The six combat emotes are key taps on their default keypad bindings instead of chat commands, so no chat is
+opened and nothing is typed:
+
+| Action | Key | Game command |
+|---|---|---|
+| `combatLeft` | Keypad 1 (`numpad1`) | `/left` |
+| `combatStop` | Keypad 2 (`numpad2`) | `/stop` |
+| `combatRight` | Keypad 3 (`numpad3`) | `/right` |
+| `combatYes` | Keypad 4 (`numpad4`) | `/yes` |
+| `combatForward` | Keypad 5 (`numpad5`) | `/forward` |
+| `combatNo` | Keypad 6 (`numpad6`) | `/no` |
+
+Wire `mods` is `[]`, phases `down` / `up`, as for any tap. `numpad1` and `left` are different keys: the arrow
+key is rejected for these actions. The six names are not in `emotes.txt`, so `/left` etc. sent as chat are
+rejected.
+
 ## Speed and Acceleration limiter wheels (protocol 41.26)
 
-Protocol v2 adds `wheel` alongside the existing key commands. There are 23 key actions and two separate wheel
+Protocol v2 adds `wheel` alongside the existing key commands. There are 29 key actions and two separate wheel
 actions; wheel actions cannot be sent as `key` commands. Only these five fields are accepted:
 
 ```json

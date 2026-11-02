@@ -73,6 +73,16 @@ internal static class KeyMap
         map["pageup"] = new KeyInfo(0x49, true, 0x21);
         map["pagedown"] = new KeyInfo(0x51, true, 0x22);
 
+        // Keypad 1..6 share scan codes with End/Down/PageDown/Left/-/Right but without the E0 prefix,
+        // so Extended must stay false. VK_NUMPAD1 = 0x61; with NumLock off the physical key reports the
+        // navigation VK instead, so the conflict check only sees a held keypad key while NumLock is on.
+        ushort[] keypadScanCodes = [0x4F, 0x50, 0x51, 0x4B, 0x4C, 0x4D];
+        for (var keypad = 1; keypad <= keypadScanCodes.Length; keypad++)
+        {
+            map["numpad" + keypad.ToString(System.Globalization.CultureInfo.InvariantCulture)] =
+                new KeyInfo(keypadScanCodes[keypad - 1], false, 0x60 + keypad);
+        }
+
         // Modifiers: injected as the left key (right Alt for "ralt"), conflicts checked side-agnostic.
         map["ctrl"] = new KeyInfo(0x1D, false, 0x11);  // VK_CONTROL
         map["shift"] = new KeyInfo(0x2A, false, 0x10); // VK_SHIFT

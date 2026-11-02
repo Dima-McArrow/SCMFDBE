@@ -34,6 +34,12 @@ public sealed class Win32Tests
     [InlineData("ralt", 0x38, true)]
     [InlineData("up", 0x48, true)]
     [InlineData("pagedown", 0x51, true)]
+    [InlineData("numpad1", 0x4F, false)]
+    [InlineData("numpad2", 0x50, false)]
+    [InlineData("numpad3", 0x51, false)]
+    [InlineData("numpad4", 0x4B, false)]
+    [InlineData("numpad5", 0x4C, false)]
+    [InlineData("numpad6", 0x4D, false)]
     public void ScanCodesMatchSpecTable(string key, int scanCode, bool extended)
     {
         var info = KeyMap.All[key];

@@ -38,6 +38,19 @@ public sealed class EmoteAllowlist : IEmoteAllowlist
             .Where(line => line.Length > 0 && !line.StartsWith('#')));
     }
 
+    /// <summary>
+    /// Base names of <paramref name="reference"/> that this list lacks, in ordinal order. Used to show which
+    /// built-in emotes an older emotes.txt still rejects, since an existing file is never rewritten.
+    /// </summary>
+    public IReadOnlyList<string> MissingFrom(EmoteAllowlist reference)
+    {
+        ArgumentNullException.ThrowIfNull(reference);
+        return reference._baseNames
+            .Where(name => !_baseNames.Contains(name))
+            .Order(StringComparer.Ordinal)
+            .ToList();
+    }
+
     public bool IsAllowed(string text)
     {
         ArgumentNullException.ThrowIfNull(text);

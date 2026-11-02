@@ -55,6 +55,14 @@ public static class ActionCatalog
         Tap("cycleConfiguration", "k", Modifiers.Alt),
         Hold("exitSeat", "y", 1000),
         Hold("selfDestruct", "backspace", 3000),
+
+        // Combat emotes on their default keypad bindings: a tap instead of typing /left etc. into chat.
+        Tap("combatLeft", "numpad1"),
+        Tap("combatStop", "numpad2"),
+        Tap("combatRight", "numpad3"),
+        Tap("combatYes", "numpad4"),
+        Tap("combatForward", "numpad5"),
+        Tap("combatNo", "numpad6"),
     }.ToFrozenDictionary(spec => spec.Action, StringComparer.Ordinal);
 
     public static bool TryGet(string action, [NotNullWhen(true)] out ActionSpec? spec) =>

@@ -170,4 +170,14 @@ public sealed class EmoteAllowlistTests
         Assert.Equal(2, list.Count);
         Assert.Equal(["Bad", "two words", "dance2", "_x"], list.Skipped);
     }
+
+    [Fact]
+    public void ListsReferenceNamesItLacks()
+    {
+        var reference = EmoteAllowlist.Parse("wave\ndance\nsalute\nbow\n");
+
+        Assert.Equal(["bow", "salute"], _list.MissingFrom(reference));
+        Assert.Empty(_list.MissingFrom(_list));
+        Assert.Empty(reference.MissingFrom(EmoteAllowlist.Parse(string.Empty)));
+    }
 }

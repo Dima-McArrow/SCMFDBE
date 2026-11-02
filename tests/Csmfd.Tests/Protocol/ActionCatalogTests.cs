@@ -30,6 +30,12 @@ public sealed class ActionCatalogTests
     [InlineData("cycleConfiguration", "k", Modifiers.Alt, ActionKind.Tap, null)]
     [InlineData("exitSeat", "y", Modifiers.None, ActionKind.Hold, 1000)]
     [InlineData("selfDestruct", "backspace", Modifiers.None, ActionKind.Hold, 3000)]
+    [InlineData("combatLeft", "numpad1", Modifiers.None, ActionKind.Tap, null)]
+    [InlineData("combatStop", "numpad2", Modifiers.None, ActionKind.Tap, null)]
+    [InlineData("combatRight", "numpad3", Modifiers.None, ActionKind.Tap, null)]
+    [InlineData("combatYes", "numpad4", Modifiers.None, ActionKind.Tap, null)]
+    [InlineData("combatForward", "numpad5", Modifiers.None, ActionKind.Tap, null)]
+    [InlineData("combatNo", "numpad6", Modifiers.None, ActionKind.Tap, null)]
     public void MatchesSpecTable(string action, string key, Modifiers mods, ActionKind kind, int? defaultHoldMs)
     {
         Assert.True(ActionCatalog.TryGet(action, out var spec));
@@ -40,14 +46,14 @@ public sealed class ActionCatalogTests
     [Fact]
     public void ContainsOnlySpecActions()
     {
-        Assert.Equal(23, ActionCatalog.All.Count);
+        Assert.Equal(29, ActionCatalog.All.Count);
     }
 
     [Fact]
     public void KeyDictionaryMatchesSpec()
     {
-        // a-z, 0-9, f1-f12, 15 named keys, mouse1-mouse5.
-        Assert.Equal(26 + 10 + 12 + 15 + 5, KeyNames.All.Count);
+        // a-z, 0-9, f1-f12, 15 named keys, mouse1-mouse5, numpad1-numpad6.
+        Assert.Equal(26 + 10 + 12 + 15 + 5 + 6, KeyNames.All.Count);
     }
 
     [Fact]

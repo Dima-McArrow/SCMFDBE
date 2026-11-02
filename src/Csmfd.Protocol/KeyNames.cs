@@ -40,6 +40,12 @@ public static class KeyNames
             "mouse1", "mouse2", "mouse3", "mouse4", "mouse5",
         ]);
 
+        // Only the keypad keys the catalog uses (combat emotes), not the whole keypad.
+        for (var keypad = 1; keypad <= 6; keypad++)
+        {
+            names.Add("numpad" + keypad.ToString(CultureInfo.InvariantCulture));
+        }
+
         return names.ToFrozenSet(StringComparer.Ordinal);
     }
 }

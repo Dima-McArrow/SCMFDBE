@@ -60,6 +60,29 @@ public sealed class ClientMessageParserTests
         Assert.Null(command.Ms);
     }
 
+    [Fact]
+    public void ParsesCombatEmoteFixture()
+    {
+        var command = AssertSuccess<KeyCommand>(Fixture.Read("client-key-combat-left-down.json"));
+
+        Assert.Equal(new ActionSpec("combatLeft", "numpad1", Modifiers.None, ActionKind.Tap, null), command.Spec);
+        Assert.Equal(KeyPhase.Down, command.Phase);
+        Assert.Null(command.Ms);
+    }
+
+    [Theory]
+    [InlineData("combatLeft", "left")]
+    [InlineData("combatStop", "2")]
+    [InlineData("combatRight", "right")]
+    public void RejectsCombatEmoteOnNonKeypadKey(string action, string key)
+    {
+        // Arrow keys and top-row digits share names or scan codes with the keypad but are other bindings.
+        var failure = AssertFailure(
+            $$"""{"v":2,"type":"key","id":"4d88b2ad-d306-443a-8524-155575227708","action":"{{action}}","phase":"down","key":"{{key}}","mods":[]}""",
+            ParseFailureKind.CommandRejected);
+        Assert.Equal(RejectReason.Invalid, failure.Reason);
+    }
+
     [Theory]
     [InlineData("coupledMode", "c", "")]
     [InlineData("cruiseMode", "c", "\"alt\"")]

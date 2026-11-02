@@ -214,6 +214,14 @@ internal sealed partial class ServerApp : IAsyncDisposable
             LogEmotesSkipped(logger, emotes.Skipped.Count, string.Join(", ", emotes.Skipped));
         }
 
+        // An existing file is never rewritten, so emotes added to the defaults later are rejected until
+        // the user adds them; name them instead of leaving a silent "invalid".
+        var missing = emotes.MissingFrom(EmoteAllowlist.Parse(DefaultEmotes));
+        if (missing.Count > 0)
+        {
+            LogEmotesMissing(logger, missing.Count, string.Join(", ", missing));
+        }
+
         return emotes;
     }
 
@@ -319,6 +327,9 @@ internal sealed partial class ServerApp : IAsyncDisposable
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "emotes.txt: {Count} invalid entries skipped: {Names}")]
     private static partial void LogEmotesSkipped(ILogger logger, int count, string names);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "emotes.txt: {Count} built-in emotes missing and rejected until added: {Names}")]
+    private static partial void LogEmotesMissing(ILogger logger, int count, string names);
 
     /// <summary>
     /// Written to emotes.txt on first start. Same stems and order as Emote.swift on the iPad
